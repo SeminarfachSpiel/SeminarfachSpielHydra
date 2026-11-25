@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Die Hydra von Lerna – Wer erzählt die Geschichte?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#f4ead6;--gold:#e0b45a;--clay:#c8643c;--night:#120f1c;--panel:rgba(18,14,28,.93)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#0b0912;color:var(--ink);font-family:"Cormorant Garamond",Georgia,serif}
+#app{position:relative;height:100dvh;max-width:920px;margin:0 auto;display:flex;flex-direction:column;background:var(--night);user-select:none}
+#stage{position:relative;flex:1 1 50%;min-height:200px;overflow:hidden}
+#bg,#bg2{position:absolute;inset:0;transition:opacity .7s}
+#bg svg,#bg2 svg{width:100%;height:100%;display:block}
+#bg2{opacity:0}
+#chars{position:absolute;inset:0}
+.slot{position:absolute;bottom:0;height:90%;width:32%;display:flex;justify-content:center;align-items:flex-end;transition:filter .4s,opacity .4s,transform .4s;animation:enter .5s both}
+.slot.l{left:3%}.slot.c{left:34%}.slot.r{left:65%}
+.slot svg{height:100%;width:auto;max-width:100%;overflow:visible}
+.slot.big svg{transform:scale(1.1);transform-origin:50% 100%}
+.slot.small svg{transform:scale(.62);transform-origin:50% 100%}
+.slot.dim{filter:brightness(.5) saturate(.7)}
+@keyframes enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.sway{transform-origin:400px 360px;animation:sway 4.2s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:rotate(-2.6deg)}50%{transform:rotate(2.6deg)}}
+#box{position:relative;flex:0 0 auto;min-height:206px;max-height:50%;overflow:auto;padding:14px 18px 16px;background:var(--panel);border-top:2px solid var(--gold);cursor:pointer}
+#name{font:700 13px/1 Cinzel,serif;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);min-height:15px;margin-bottom:6px}
+#text{font-size:clamp(19px,2.6vw,23px);line-height:1.38;min-height:5.2em;white-space:pre-wrap}
+#text.n{font-style:italic;color:#e8dcc3}
+#more{position:absolute;right:16px;bottom:8px;color:var(--gold);animation:bob 1s infinite}
+@keyframes bob{50%{transform:translateY(4px)}}
+#choices{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+#choices button{font:600 clamp(16px,2.3vw,19px)/1.25 "Cormorant Garamond",serif;text-align:left;color:var(--ink);background:rgba(200,100,60,.18);border:1.5px solid var(--clay);border-radius:10px;padding:10px 14px;cursor:pointer;animation:enter .35s both}
+#choices button:hover,#choices button:focus-visible{background:rgba(200,100,60,.42);outline:none}
+.overlay{position:absolute;inset:0;z-index:10;background:linear-gradient(180deg,rgba(10,8,18,.55),rgba(10,8,18,.93));display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;padding:24px;overflow:auto}
+.overlay>:first-child{margin-top:auto}.overlay>:last-child{margin-bottom:auto}
+#after{background:rgba(10,8,18,.97)}
+.overlay h1{font:700 clamp(28px,6vw,52px)/1.1 Cinzel,serif;letter-spacing:.05em;margin:0 0 8px;color:var(--gold);text-shadow:0 3px 18px #000}
+.overlay h2{font:700 clamp(22px,4vw,32px)/1.15 Cinzel,serif;color:var(--gold);margin:0 0 14px}
+.overlay .sub{font-size:clamp(19px,3vw,26px);font-style:italic;margin:0 0 22px;max-width:30em}
+.overlay p{max-width:36em;font-size:clamp(17px,2.4vw,20px);line-height:1.45;margin:0 0 12px;text-align:left}
+.overlay .note{font-size:15px;opacity:.75;max-width:30em;text-align:center;margin-top:18px}
+.btn{font:700 15px/1 Cinzel,serif;letter-spacing:.1em;text-transform:uppercase;color:#1a1208;background:var(--gold);border:0;border-radius:99px;padding:14px 26px;cursor:pointer}
+.btn:hover{filter:brightness(1.1)}
+.hide{display:none!important}
+.end{font:700 clamp(20px,3.5vw,28px)/1.2 Cinzel,serif;color:var(--gold)}
+@media (max-width:560px){#box{padding:12px 14px 16px;min-height:220px}}
+@media (max-height:700px){#box{max-height:64%;min-height:170px}#text{font-size:17px;min-height:4.4em}#choices{gap:6px;margin-top:8px}#choices button{font-size:15px;padding:7px 11px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="bg"></div><div id="bg2"></div>
+    <div id="chars"></div>
+  </div>
+  <div id="box">
+    <div id="name"></div>
+    <div id="text"></div>
+    <div id="choices"></div>
+    <div id="more" class="hide">▾</div>
+  </div>
+
+  <div id="title" class="overlay">
+    <h1>Die Hydra<br>von Lerna</h1>
+    <p class="sub">Eine Visual Novel darüber, wer eine Geschichte erzählen darf.</p>
+    <button class="btn" id="start">Beginnen</button>
+    <div class="note">Tippen oder Leertaste zum Weiterlesen.</div>
+  </div>
+
+  <div id="after" class="overlay hide">
+    <h2 id="endTitle"></h2>
+    <p id="sum"></p><p id="ends"></p>
+    <p>Kallis ist erfunden, die Hydra ein Mythos. Was Kallis erlebt, ist es nicht. Dafür gibt es Begriffe:</p>
+    <p><b>Bropropriating</b> heißt, dass Männer Ideen, Leistungen oder Worte von Frauen übernehmen und den Applaus erhalten, der der Urheberin versagt blieb. Iolaos sagt nichts Neues. Er sagt es nur mit einem anderen Gesicht, und plötzlich ist es wahr.</p>
+    <p>Die Wissenschaftshistorikerin Margaret Rossiter nannte den großen Zusammenhang 1993 den <b>Matilda-Effekt</b>: Leistungen von Forscherinnen werden immer wieder Männern zugeschrieben.</p>
+    <p>Die Philosophin Miranda Fricker beschreibt das Nichtglauben als <b>Zeugnisungerechtigkeit</b> (testimonial injustice): Eine Sprecherin gilt als weniger glaubwürdig, nicht wegen ihrer Beweise, sondern wegen Vorurteilen über sie. Darum sind Zahn, Gift und Narbe für Kallis wertlos und für Archias ein Wunder.</p>
+    <p><i>Welche Geschichten kennst du nur mit dem Namen des Mannes, der sie erzählt hat?</i></p>
+    <button class="btn" id="again" style="margin-top:10px">Noch einmal spielen</button>
+  </div>
+</div>
+
+<script>
+
+function rnd(seed){let s=seed;return()=>{s=(s*16807)%2147483647;return (s-1)/2147483646}}
+const GR=(id,stops)=>`<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${stops.map(([o,c])=>`<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient>`;
+function shade(hex,a){const n=parseInt(hex.slice(1),16),f=1-a;return `rgb(${Math.round(((n>>16)&255)*f)},${Math.round(((n>>8)&255)*f)},${Math.round((n&255)*f)})`}
+function hills(col,y,amp,seed){const r=rnd(seed);let d=`M0 450 L0 ${y}`;for(let x=0;x<800;x+=100){d+=` Q ${x+50} ${y-amp*(0.3+r())} ${x+100} ${y-amp*(r()-.5)}`}return `<path d="${d} L800 450Z" fill="${col}"/>`}
+function house(x,y,w,h,wall,roof,lit){
+  return `<rect x="${x}" y="${y-h}" width="${w}" height="${h}" fill="${wall}"/><rect x="${x+w*.72}" y="${y-h}" width="${w*.28}" height="${h}" fill="rgba(0,0,0,.12)"/>`+
+  `<polygon points="${x-9},${y-h+2} ${x+w/2},${y-h-h*.62} ${x+w+9},${y-h+2}" fill="${roof}"/><rect x="${x-9}" y="${y-h-1}" width="${w+18}" height="5" fill="rgba(0,0,0,.22)"/>`+
+  `<path d="M${x+w*.12} ${y} v-${h*.46} q${w*.11} -${w*.16} ${w*.22} 0 v${h*.46}Z" fill="#3a2418"/>`+
+  `<rect x="${x+w*.55}" y="${y-h*.72}" width="${w*.24}" height="${h*.3}" fill="${lit?'#ffd36a':'#2a2030'}"/><path d="M${x+w*.67} ${y-h*.72} v${h*.3} M${x+w*.55} ${y-h*.57} h${w*.24}" stroke="rgba(60,30,10,.7)" stroke-width="1.5"/>`}
+function reeds(n,y0,spread,seed,col,tops){const r=rnd(seed);let s='';for(let i=0;i<n;i++){const x=r()*800,h=40+r()*spread,y=y0+r()*50,lean=(r()-.5)*14;s+=`<path d="M${x} ${y} Q${x+lean/2} ${y-h/2} ${x+lean} ${y-h}" stroke="${col}" stroke-width="${1.5+r()*1.8}" fill="none"/>`;if(tops&&r()>.65)s+=`<ellipse cx="${x+lean}" cy="${y-h}" rx="2.6" ry="9" fill="#5a3b25"/>`}return s}
+function mist(seed,n,op){const r=rnd(seed);let s='';for(let i=0;i<n;i++)s+=`<ellipse cx="${r()*800}" cy="${250+r()*150}" rx="${120+r()*140}" ry="${14+r()*22}" fill="#fff" opacity="${op}"/>`;return s}
+function tree(x,y,s,col){return `<rect x="${x-3*s}" y="${y-30*s}" width="${6*s}" height="${30*s}" fill="#2a2018"/><circle cx="${x}" cy="${y-42*s}" r="${22*s}" fill="${col}"/><circle cx="${x-14*s}" cy="${y-32*s}" r="${15*s}" fill="${col}"/><circle cx="${x+15*s}" cy="${y-34*s}" r="${16*s}" fill="${col}"/>`}
+
+function hydraHead(x,y,side,big,gold){
+  const s=big?1.5:1,rot=side<0?24:-24;
+  return `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${side<0?-s:s} ${s}) translate(28 0)">`+
+  `<path d="M-28 -3 Q-26 -15 -4 -16 Q16 -16 34 -6 L38 0 L-28 3Z" fill="#2f5a3b"/>`+
+  `<path d="M-26 3 Q-10 15 16 10 L36 4 L30 8 Q12 23 -14 19 Q-28 14 -26 3Z" fill="#1f4029"/>`+
+  `<path d="M-14 -14 L-10 -24 L-5 -15 L2 -25 L6 -15 L13 -22 L14 -12Z" fill="#3d7a4c"/>`+
+  `<ellipse cx="-8" cy="-8" rx="4.4" ry="3.6" fill="${gold?'#f2c53d':'#d8e34a'}"/><ellipse cx="-8" cy="-8" rx="1" ry="3.2" fill="#111"/>`+
+  `<path d="M12 -5 l2 8 l3 -7Z M24 -3 l1.5 7 l3 -6Z M8 10 l2 -8 l3 8Z M20 7 l2 -6 l2.5 6Z" fill="#f4efd8"/>`+
+  `<circle cx="32" cy="-3" r="1.2" fill="#0d1d12"/></g>`;
+}
+function hydra(n,fire){
+  if(!n)return '';
+  const cx=400,by=372;let o='';
+  if(fire)o+=`<radialGradient id="fg"><stop offset="0" stop-color="#ffb347" stop-opacity=".6"/><stop offset="1" stop-color="#ff5a1f" stop-opacity="0"/></radialGradient><circle cx="400" cy="340" r="300" fill="url(#fg)"/>`;
+  o+=`<ellipse cx="${cx}" cy="${by+4}" rx="150" ry="52" fill="#17301f"/><path d="M${cx-130} ${by+10} Q${cx-90} ${by-60} ${cx} ${by-66} Q${cx+90} ${by-60} ${cx+130} ${by+10}Z" fill="#24452f"/>`+
+  `<path d="M${cx-90} ${by-20} Q${cx} ${by-60} ${cx+90} ${by-20}" stroke="#3d7a4c" stroke-width="3" fill="none" opacity=".6"/>`;
+  for(let i=0;i<9;i++)o+=`<path d="M${cx-84+i*21} ${by-46+Math.abs(i-4)*7} l5 -14 l5 14Z" fill="#3d7a4c"/>`;
+  for(let i=0;i<n;i++){
+    const t=n===1?.5:i/(n-1);
+    const spread=n===1?0:Math.min(340,46*n);
+    const x=cx+(t-.5)*spread;
+    const hy=n===1?88:96+((i*37)%5)*26;
+    const bx=cx+(t-.5)*120;
+    const side=n===1?1:(x<cx?-1:1);
+    const big=n===1;
+    const cxn=bx+(x-bx)*.15+side*28, cyn=hy+(by-hy)*.55;
+    o+=`<g class="sway" style="animation-delay:-${(i*.73).toFixed(2)}s"><path d="M${bx} ${by-30} Q${cxn} ${cyn} ${x} ${hy}" stroke="#24452f" stroke-width="${big?40:19}" fill="none" stroke-linecap="round"/>`+
+    `<path d="M${bx} ${by-30} Q${cxn} ${cyn} ${x} ${hy}" stroke="#3d7a4c" stroke-width="${big?6:3}" stroke-dasharray="2 9" fill="none" opacity=".7"/>`+
+    hydraHead(x,hy,side,big,big)+`</g>`;
+  }
+  o+=`<path d="M0 ${by-6} Q200 ${by-16} 400 ${by-8} T800 ${by-6} L800 450 L0 450Z" fill="url(#wt2)" opacity=".62"/>`;
+  [[120,26,.28],[170,34,.18],[220,42,.1]].forEach(([rx,ry,op])=>{o+=`<ellipse cx="${cx}" cy="${by+2}" rx="${rx}" ry="${ry}" fill="none" stroke="#e8f4ee" stroke-width="2" opacity="${op}"/>`});
+  if(fire){const r=rnd(7);for(let i=0;i<14;i++)o+=`<circle cx="${250+r()*300}" cy="${250+r()*130}" r="${1.5+r()*2.5}" fill="#ffd58a"/>`}
+  return o;
+}
+
+function bgSVG(name){
+  const [kind,a,b]=name.split(':');let d='',body='';
+  if(kind==='dorf'){
+    d=GR('sk',[[0,'#f5b46a'],[.45,'#b05a7a'],[1,'#3a2a52']]);
+    body=`<rect width="800" height="450" fill="url(#sk)"/><circle cx="520" cy="268" r="62" fill="#ffd49a" opacity=".35"/><circle cx="520" cy="268" r="48" fill="#ffe2a0"/>`+
+    `<ellipse cx="200" cy="120" rx="150" ry="9" fill="#fff" opacity=".13"/><ellipse cx="560" cy="170" rx="190" ry="8" fill="#fff" opacity=".12"/>`+
+    `${hills('#5a4468',300,34,3)}${hills('#3d2e4d',350,26,9)}`+
+    `<path d="M0 372 Q200 360 400 372 T800 372 L800 450 L0 450Z" fill="#2b2238"/>`+
+    `${tree(450,376,1.1,'#2d3d3a')}${tree(40,380,.9,'#2d3d3a')}`+
+    `${house(70,388,96,66,'#d7b389','#8c4a35',1)}${house(220,392,108,78,'#cfa97f','#7e3d2c',0)}${house(372,388,86,60,'#d9b88e','#8c4a35',1)}`+
+    `<path d="M300 450 Q330 420 360 392 L400 392 Q380 430 410 450Z" fill="#6a5238" opacity=".7"/>`+
+    `${[0,1,2,3,4,5].map(i=>`<rect x="${12+i*20}" y="414" width="4" height="26" fill="#4a3426"/>`).join('')}<path d="M10 424 H132 M10 434 H132" stroke="#4a3426" stroke-width="3"/>`+
+    `<ellipse cx="116" cy="268" rx="12" ry="7" fill="#fff" opacity=".2"/><ellipse cx="128" cy="248" rx="16" ry="8" fill="#fff" opacity=".13"/>`+
+    `<path d="M520 410 Q590 372 690 382 Q770 374 800 392 L800 450 L500 450Z" fill="#26443f"/><path d="M540 430 Q640 418 760 430" stroke="#5f8f86" stroke-width="2" fill="none" opacity=".4"/>`+
+    `${reeds(34,404,60,5,'#16302b',1)}${mist(4,5,.16)}`;
+  }else if(kind==='hof'){
+    d=GR('wl',[[0,'#6a2a28'],[1,'#2b1414']])+`<radialGradient id="gl"><stop offset="0" stop-color="#ffb84a" stop-opacity=".7"/><stop offset="1" stop-color="#ffb84a" stop-opacity="0"/></radialGradient>`;
+    let cols='';[70,300,500,730].forEach(x=>{cols+=`<rect x="${x-22}" y="30" width="44" height="330" fill="#e6d6b2"/><rect x="${x+4}" y="30" width="18" height="330" fill="#cbb98f"/>${[-12,-4,4,12].map(o=>`<line x1="${x+o}" y1="44" x2="${x+o}" y2="350" stroke="rgba(0,0,0,.08)" stroke-width="2"/>`).join('')}<rect x="${x-30}" y="22" width="60" height="14" fill="#f1e4c4"/><rect x="${x-28}" y="352" width="56" height="12" fill="#f1e4c4"/>`});
+    const torch=x=>`<circle cx="${x}" cy="150" r="48" fill="url(#gl)"/><rect x="${x-2}" y="150" width="4" height="26" fill="#3a2418"/><path d="M${x} 118 q-9 14 0 30 q9 -16 0 -30Z" fill="#ffb347"/><path d="M${x} 130 q-4 8 0 17 q4 -9 0 -17Z" fill="#ffe08a"/>`;
+    const banner=x=>`<rect x="${x-34}" y="46" width="68" height="132" fill="#8e1f1f"/><path d="M${x-34} 178 l17 -14 l17 14 l17 -14 l17 14Z" fill="#8e1f1f"/><circle cx="${x}" cy="94" r="20" fill="#d8a84a"/><circle cx="${x}" cy="94" r="10" fill="#8e1f1f"/><rect x="${x-34}" y="46" width="68" height="6" fill="#d8a84a"/>`;
+    body=`<rect width="800" height="450" fill="url(#wl)"/><path d="M336 362 V168 Q400 92 464 168 V362Z" fill="#190c0c"/><path d="M336 168 Q400 92 464 168" stroke="#d8c394" stroke-width="6" fill="none"/>${cols}${banner(185)}${banner(615)}${torch(92)}${torch(322)}${torch(522)}${torch(752)}`+
+    `<rect y="362" width="800" height="88" fill="#3b2a22"/><path d="M0 362 H800" stroke="#d8c394" stroke-width="4"/>${[0,1,2,3,4,5,6,7,8].map(i=>`<line x1="${i*100}" y1="362" x2="${400+(i*100-400)*2.2}" y2="450" stroke="#2a1c16" stroke-width="3"/>`).join('')}<path d="M0 392 H800 M0 420 H800" stroke="#2a1c16" stroke-width="2"/>`+
+    `<rect x="220" y="318" width="360" height="16" fill="#7a5232"/><rect x="240" y="334" width="10" height="40" fill="#5a3a22"/><rect x="550" y="334" width="10" height="40" fill="#5a3a22"/>${[270,340,410,480,530].map(x=>`<rect x="${x}" y="300" width="14" height="18" rx="3" fill="#e2b84a"/>`).join('')}`+
+    `<g transform="translate(0 40)"><path d="M126 322 q-20 -10 -16 -40 q6 -12 20 -12 q14 0 20 12 q4 30 -16 40Z" fill="#b8663a"/><rect x="122" y="260" width="16" height="12" fill="#b8663a"/><path d="M114 292 q16 8 32 0" stroke="#7a3a1a" stroke-width="3" fill="none"/></g>`;
+  }else if(kind==='sumpf'||kind==='kampf'){
+    const fight=kind==='kampf';
+    d=GR('sk',fight?[[0,'#4a3b3a'],[1,'#241c20']]:[[0,'#b6c9b0'],[1,'#6f8c7a']])+GR('wt',fight?[[0,'#26413a'],[1,'#121f1d']]:[[0,'#4a6e63'],[1,'#22403b']])+GR('wt2',fight?[[0,'#2a4a42'],[1,'#0f1a18']]:[[0,'#4a6e63'],[1,'#22403b']]);
+    const r=rnd(11);let trees='';for(let i=0;i<7;i++){const x=40+i*115+r()*40,h=120+r()*80;trees+=`<path d="M${x} 300 L${x+4} ${300-h} M${x+3} ${300-h*.6} L${x-30} ${300-h*.85} M${x+4} ${300-h*.75} L${x+34} ${300-h*.95}" stroke="${fight?'#17110f':'#3a4a3d'}" stroke-width="5" fill="none" stroke-linecap="round"/>`}
+    const r2=rnd(5);let lil='';if(!fight)for(let i=0;i<9;i++)lil+=`<ellipse cx="${r2()*800}" cy="${330+r2()*90}" rx="${14+r2()*14}" ry="${4+r2()*3}" fill="#3f6b4a"/>`;
+    body=`<rect width="800" height="450" fill="url(#sk)"/>${fight?'':'<circle cx="610" cy="120" r="40" fill="#f2f0d8" opacity=".55"/>'}${trees}<rect y="296" width="800" height="154" fill="url(#wt)"/>${lil}${reeds(70,350,90,2,fight?'#0f1d17':'#2d4a3b',1)}${fight?hydra(+a,b==='fire'):''}${reeds(24,440,110,21,fight?'#0a120e':'#1d3328',0)}${mist(6,fight?4:8,fight?.07:.2)}`;
+  }else if(kind==='morgen'){
+    d=GR('sk',[[0,'#ffe0a8'],[.6,'#cfe0e0'],[1,'#a9c4d4']]);
+    body=`<rect width="800" height="450" fill="url(#sk)"/><circle cx="400" cy="300" r="64" fill="#fff3cf" opacity=".85"/><ellipse cx="160" cy="90" rx="90" ry="14" fill="#fff" opacity=".5"/><ellipse cx="620" cy="130" rx="120" ry="12" fill="#fff" opacity=".45"/>${hills('#9bb6a0',290,22,5)}${hills('#7e9a84',330,18,8)}${tree(290,372,.9,'#5f8a62')}${tree(520,374,1,'#5f8a62')}<rect y="360" width="800" height="90" fill="#9c8660"/>${house(30,366,100,70,'#e5d2a8','#b0583a',0)}${house(160,360,86,58,'#ead9b0','#a24c32',0)}${house(580,366,98,72,'#e3cfa6','#b0583a',0)}${house(700,360,84,56,'#ead9b0','#a24c32',0)}<ellipse cx="400" cy="372" rx="52" ry="10" fill="#7d7a74"/><rect x="360" y="336" width="80" height="36" rx="6" fill="#8d8a84"/><rect x="360" y="326" width="80" height="12" rx="6" fill="#a9a59c"/><path d="M366 338 h68 M366 350 h68" stroke="rgba(0,0,0,.18)" stroke-width="2"/><rect x="364" y="280" width="6" height="50" fill="#5b3a22"/><rect x="430" y="280" width="6" height="50" fill="#5b3a22"/><path d="M356 282 L400 262 L444 282Z" fill="#8c4a35"/><path d="M0 416 Q400 380 800 416 L800 450 L0 450Z" fill="#8a7650"/>`;
+  }else if(kind==='rat'){
+    d=GR('wl',[[0,'#d5c9b0'],[1,'#a89a7e']])+GR('sk2',[[0,'#a9d2e8'],[1,'#f6ecd2']]);
+    let blocks='';for(let y=20;y<350;y+=44){blocks+=`<line x1="0" y1="${y}" x2="800" y2="${y}" stroke="rgba(0,0,0,.07)" stroke-width="2"/>`;for(let x=((y/44)%2)*60;x<800;x+=120)blocks+=`<line x1="${x}" y1="${y}" x2="${x}" y2="${y+44}" stroke="rgba(0,0,0,.06)" stroke-width="2"/>`}
+    const arch=i=>{const x=70+i*250;return `<clipPath id="ar${i}"><path d="M${x} 340 V170 Q${x+80} 70 ${x+160} 170 V340Z"/></clipPath><g clip-path="url(#ar${i})"><rect x="${x}" y="60" width="160" height="290" fill="url(#sk2)"/><path d="M${x} 300 Q${x+50} 250 ${x+90} 290 Q${x+130} 262 ${x+160} 296 V340 H${x}Z" fill="#9bb6a0"/></g><path d="M${x} 340 V170 Q${x+80} 70 ${x+160} 170 V340" fill="none" stroke="#8c7f66" stroke-width="9"/>`};
+    body=`<rect width="800" height="450" fill="url(#wl)"/>${blocks}${[0,1,2].map(arch).join('')}${[30,285,535,780].map(x=>`<rect x="${x-20}" y="70" width="40" height="285" fill="#b7ad98"/><rect x="${x-20}" y="70" width="12" height="285" fill="rgba(255,255,255,.12)"/><rect x="${x-27}" y="60" width="54" height="14" fill="#cfc5ae"/><rect x="${x-27}" y="348" width="54" height="12" fill="#cfc5ae"/>`).join('')}`+
+    `<polygon points="150,200 230,200 330,450 120,450" fill="#fff" opacity=".09"/><polygon points="400,200 480,200 580,450 370,450" fill="#fff" opacity=".07"/>`+
+    `<rect y="356" width="800" height="94" fill="#7b705f"/>${[-4,-3,-2,-1,0,1,2,3,4,5,6,7,8].map(i=>`<line x1="${400+(i*100-400)*.25}" y1="356" x2="${i*100}" y2="450" stroke="rgba(0,0,0,.18)" stroke-width="2"/>`).join('')}<path d="M0 376 H800 M0 404 H800 M0 436 H800" stroke="rgba(0,0,0,.15)" stroke-width="2"/>`+
+    `<rect x="20" y="372" width="200" height="24" fill="#5b3f26"/><rect x="20" y="406" width="220" height="26" fill="#4a3320"/><rect x="580" y="372" width="200" height="24" fill="#5b3f26"/><rect x="560" y="406" width="220" height="26" fill="#4a3320"/><rect x="300" y="392" width="200" height="22" fill="#9a8c74"/><rect x="320" y="378" width="160" height="14" fill="#b3a68c"/>`;
+  }else{
+    d=GR('sk',[[0,'#070b25'],[1,'#2e2b5c']])+`<mask id="mn"><rect width="800" height="450" fill="#fff"/><circle cx="658" cy="82" r="30" fill="#000"/></mask>`;
+    const r=rnd(13);let st='';for(let i=0;i<80;i++)st+=`<circle cx="${r()*800}" cy="${r()*260}" r="${.5+r()*1.4}" fill="#fff" opacity="${.4+r()*.6}"/>`;
+    body=`<rect width="800" height="450" fill="url(#sk)"/>${st}<circle cx="640" cy="90" r="34" fill="#f4ecd0" mask="url(#mn)"/>${hills('#141a38',300,30,4)}${house(30,336,90,52,'#0e1230','#0a0e24',1)}${house(150,340,70,44,'#0e1230','#0a0e24',0)}${house(620,338,100,56,'#0e1230','#0a0e24',1)}<rect y="344" width="800" height="106" fill="#0c0f26"/>${reeds(24,404,70,17,'#05071a',1)}<radialGradient id="ff"><stop offset="0" stop-color="#ffb347" stop-opacity=".8"/><stop offset="1" stop-color="#ff7a1f" stop-opacity="0"/></radialGradient><circle cx="400" cy="396" r="150" fill="url(#ff)"/><rect x="370" y="418" width="60" height="7" rx="3" fill="#3a2418" transform="rotate(-8 400 421)"/><rect x="370" y="418" width="60" height="7" rx="3" fill="#2e1c12" transform="rotate(8 400 421)"/><polygon points="380,420 392,372 400,396 410,364 424,420" fill="#ff9a2f"/><polygon points="390,420 400,388 412,420" fill="#ffe08a"/>`;
+  }
+  return `<svg viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs>${d}</defs>${body}</svg>`;
+}
+
+const CH={
+ kallis:{name:'Kallis',robe:'#b8553a',hair:'#2a1a14',hairType:'bun',skin:'#d9a37a',apron:1},
+ thea:{name:'Thea',robe:'#4e7a58',hair:'#4a3020',hairType:'scarf',scarf:'#e0c070',skin:'#e0b08a'},
+ demetrios:{name:'Demetrios',robe:'#e8e2d0',hair:'#dcdcdc',hairType:'short',beard:'#e2e2e2',beardLen:128,skin:'#cf9a78',staff:1},
+ archias:{name:'Archias',robe:'#6a3d8a',hair:'#1e1e1e',hairType:'hat',beard:'#2a2a2a',beardLen:96,skin:'#d7a07c'},
+ iolaos:{name:'Iolaos',robe:'#3b6aa8',hair:'#5a3a22',hairType:'short',skin:'#e0aa84'},
+ herakles:{name:'Herakles',robe:'#d9c7a0',hair:'#4a2c18',hairType:'lion',beard:'#4a2c18',beardLen:96,skin:'#e2a982',big:1,club:1},
+ timon:{name:'Timon',robe:'#8a6b3e',hair:'#2a2a2a',hairType:'bald',beard:'#3a3a3a',beardLen:76,mus:1,skin:'#d29c76'},
+ herold:{name:'Herold',robe:'#a82a2a',hair:'#2a2a2a',hairType:'short',skin:'#dca880',horn:1},
+ brasidas:{name:'Brasidas',robe:'#6f7f45',hair:'#3a2a1a',hairType:'short',beard:'#3a2a1a',beardLen:84,skin:'#d4a07a'},
+ kleon:{name:'Kleon',robe:'#a07a4a',hair:'#8a8a8a',hairType:'short',beard:'#9a9a9a',beardLen:90,skin:'#cf9c78'},
+ myrto:{name:'Myrto',robe:'#7a4a6a',hair:'#c9c9c9',hairType:'scarf',scarf:'#b9b0c4',skin:'#cf9c78'},
+ nysa:{name:'Nysa',robe:'#e0c050',hair:'#2a1a14',hairType:'pigtails',skin:'#e0b08a',small:1}
+};
+function fig(k,mood){
+  const c=CH[k],m=mood||'neutral',br=c.big?9:0,sk=c.skin,rb=c.robe,dk=shade(rb,.24),skd=shade(sk,.2),h=c.hair,T=c.hairType;
+  const hc=T==='scarf'?c.scarf:h;
+  let s=`<svg viewBox="0 0 120 250" xmlns="http://www.w3.org/2000/svg">`;
+  s+=`<ellipse cx="60" cy="244" rx="${44+br}" ry="5" fill="rgba(0,0,0,.38)"/>`;
+  if(T==='lion'){let p='';for(let a=0;a<360;a+=20){const r=a%40?26:34,x=60+r*Math.cos(a*Math.PI/180),y=54+r*Math.sin(a*Math.PI/180);p+=`${x.toFixed(1)},${y.toFixed(1)} `}s+=`<polygon points="${p}" fill="#a87a2c"/>`}
+
+  s+=`<ellipse cx="46" cy="240" rx="10" ry="4.5" fill="${skd}"/><ellipse cx="74" cy="240" rx="10" ry="4.5" fill="${skd}"/>`;
+  s+=`<path d="M${32-br} 94 Q60 82 ${88+br} 94 L${100+br} 234 Q60 242 ${20-br} 234Z" fill="${rb}"/>`;
+  s+=`<path d="M${32-br} 94 Q60 82 ${60} 90 L56 236 Q${36-br} 238 ${20-br} 234Z" fill="rgba(255,255,255,.07)"/>`;
+  s+=`<path d="M${21-br} 226 Q60 234 ${99+br} 226 L${100+br} 234 Q60 242 ${20-br} 234Z" fill="${dk}"/>`;
+  s+=`<path d="M46 122 Q42 180 38 228 M74 122 Q78 180 82 228 M60 104 L60 230" stroke="rgba(0,0,0,.13)" stroke-width="2" fill="none"/>`;
+  if(c.apron)s+=`<path d="M44 108 L76 108 L84 232 L36 232Z" fill="rgba(255,240,210,.55)"/><path d="M44 98 L46 110 M76 98 L74 110" stroke="rgba(255,240,210,.7)" stroke-width="3"/>`;
+  s+=`<path d="M${33-br} 138 Q60 145 ${87+br} 138 L${87+br} 147 Q60 154 ${33-br} 147Z" fill="${dk}"/><circle cx="60" cy="146" r="3.2" fill="#e0b45a"/>`;
+
+  s+=`<path d="M${33-br} 95 Q${15-br} 126 ${21-br} 160 L${38-br} 163 Q${36-br} 128 48 105Z" fill="${rb}" stroke="${dk}" stroke-width="1"/><path d="M${21-br} 152 L${38-br} 155 L${38-br} 163 L${21-br} 160Z" fill="${dk}"/>`;
+  s+=`<path d="M${87+br} 95 Q${105+br} 126 ${99+br} 160 L${82+br} 163 Q${84+br} 128 72 105Z" fill="${rb}" stroke="${dk}" stroke-width="1"/><path d="M${99+br} 152 L${82+br} 155 L${82+br} 163 L${99+br} 160Z" fill="${dk}"/>`;
+  if(c.staff)s+=`<rect x="${88+br}" y="46" width="6" height="196" rx="3" fill="#6b4a2a"/><circle cx="${91+br}" cy="46" r="5" fill="#8a6238"/>`;
+  if(c.club)s+=`<path d="M${88+br} 182 L${96+br} 182 L${112+br} 76 Q${108+br} 50 ${92+br} 56 Q${84+br} 66 ${88+br} 182Z" fill="#6b4a2a"/><path d="M${96+br} 70 Q${100+br} 100 ${95+br} 150" stroke="#8a6238" stroke-width="3" fill="none"/><circle cx="${100+br}" cy="68" r="2" fill="#3a2418"/><circle cx="${97+br}" cy="88" r="2" fill="#3a2418"/>`;
+  if(c.horn)s+=`<path d="M${88+br} 176 Q${110+br} 160 ${116+br} 140 L${126+br} 134 Q${128+br} 150 ${120+br} 156 Q${104+br} 172 ${92+br} 182Z" fill="#e2b84a"/><ellipse cx="${124+br}" cy="142" rx="6" ry="10" transform="rotate(-30 ${124+br} 142)" fill="#f0cc5e"/>`;
+  s+=`<ellipse cx="${29-br}" cy="170" rx="6.8" ry="8.5" fill="${sk}"/><ellipse cx="${91+br}" cy="170" rx="6.8" ry="8.5" fill="${sk}"/>`;
+  if(k==='kallis'&&S.ev.narbe)s+=`<path d="M${19.5-br} 138 L${37.5-br} 142 L${36-br} 154 L${19-br} 150Z" fill="#efe6d2" stroke="#cdbf9f" stroke-width="1"/><path d="M${21-br} 143 l15 3 M${20-br} 148 l15 3" stroke="#cdbf9f" stroke-width="1.4"/><ellipse cx="${28-br}" cy="146" rx="4" ry="2.6" fill="#b5483a" opacity=".6"/>`;
+
+  if(T==='lion')s+=`<path d="M${16-br} 96 Q60 78 ${104+br} 96 L${110+br} 134 L${96+br} 128 L${88+br} 144 L72 130 L60 146 L48 130 L${32-br} 144 L${24-br} 128 L${10-br} 134Z" fill="#d8a84a"/><path d="M${30-br} 100 Q60 90 ${90+br} 100 M44 112 l6 12 M70 108 l5 14 M${28-br} 112 l4 11 M${92+br} 112 l-4 11" stroke="#a87a2c" stroke-width="2.4" fill="none"/><ellipse cx="47" cy="111" rx="6" ry="4" fill="#c4923a"/><ellipse cx="73" cy="111" rx="6" ry="4" fill="#c4923a"/>`;
+
+  s+=`<path d="M52 72 L68 72 L69 92 Q60 99 51 92Z" fill="${skd}"/>`;
+  if(T!=='lion')s+=`<path d="M47 90 L60 108 L73 90 L67 88 L60 98 L53 88Z" fill="${dk}"/>`;
+  if(T==='bun')s+=`<ellipse cx="60" cy="45" rx="23.5" ry="21" fill="${h}"/><circle cx="60" cy="22" r="9.5" fill="${h}"/><path d="M52 20 Q60 14 68 20" stroke="rgba(255,255,255,.12)" stroke-width="2" fill="none"/>`;
+  if(T==='scarf')s+=`<ellipse cx="60" cy="50" rx="21" ry="24" fill="${h}"/>`;
+  if(T==='pigtails')s+=`<ellipse cx="60" cy="52" rx="23" ry="24" fill="${h}"/><path d="M40 66 Q30 80 32 98" stroke="${h}" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M80 66 Q90 80 88 98" stroke="${h}" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M40 66 Q30 80 32 98 M80 66 Q90 80 88 98" stroke="rgba(0,0,0,.28)" stroke-width="8" stroke-dasharray="2.5 3.5" fill="none"/><circle cx="32" cy="99" r="3.4" fill="#c0392b"/><circle cx="88" cy="99" r="3.4" fill="#c0392b"/>`;
+
+  s+=`<circle cx="39.5" cy="58" r="4.2" fill="${sk}"/><circle cx="80.5" cy="58" r="4.2" fill="${sk}"/>`;
+  s+=`<ellipse cx="60" cy="56" rx="20.5" ry="23" fill="${sk}"/>`;
+  s+=`<path d="M60 56 L57.5 65 Q60 67 62.5 65" stroke="${skd}" stroke-width="1.6" fill="none"/><circle cx="47" cy="65" r="5" fill="rgba(220,90,70,.15)"/><circle cx="73" cy="65" r="5" fill="rgba(220,90,70,.15)"/>`;
+
+  if(c.beard){const bY=80+(c.beardLen-70)*.42,cc=2*bY-79;s+=`<path d="M39 58 Q37 74 46 79 Q60 ${cc} 74 79 Q83 74 81 58 Q77 73 60 74 Q43 73 39 58Z" fill="${c.beard}"/>`}
+
+  if(T==='bun')s+=`<path d="M39 58 Q37 33 60 31 Q83 33 81 58 Q77 46 70 42 Q64 40 60 40 Q56 40 50 42 Q43 46 39 58Z" fill="${h}"/>`;
+  if(T==='scarf')s+=`<path d="M38 60 Q35 29 60 27 Q85 29 82 60 Q80 45 70 41 Q60 38 50 41 Q40 45 38 60Z" fill="${c.scarf}"/><path d="M41 36 Q60 28 79 36" stroke="rgba(150,90,30,.55)" stroke-width="2" fill="none"/><path d="M79 50 Q91 58 90 84 Q82 76 77 62Z" fill="${shade(c.scarf,.15)}"/><circle cx="79" cy="52" r="4" fill="${c.scarf}"/>`;
+  if(T==='short'||T==='hat')s+=`<path d="M38 56 Q36 30 60 30 Q84 30 82 56 Q78 42 66 39 Q54 43 46 40 Q40 46 38 56Z" fill="${h}"/>`;
+  if(T==='hat')s+=`<path d="M40 36 L44 4 L76 4 L80 36Z" fill="${rb}"/><rect x="40" y="27" width="40" height="7" fill="#e0b45a"/><path d="M44 4 L76 4" stroke="#e0b45a" stroke-width="3"/>`;
+  if(T==='bald')s+=`<ellipse cx="53" cy="38" rx="9" ry="3.5" fill="rgba(255,255,255,.18)"/>`;
+  if(T==='pigtails')s+=`<path d="M39 56 Q38 34 60 33 Q82 34 81 56 Q76 44 70 42 Q60 45 50 42 Q44 44 39 56Z" fill="${h}"/>`;
+  if(T==='lion')s+=`<path d="M37 54 Q34 22 60 20 Q86 22 83 54 Q76 38 60 38 Q44 38 37 54Z" fill="#d8a84a"/><path d="M38 34 L38 14 L52 26Z M82 34 L82 14 L68 26Z" fill="#d8a84a"/><path d="M41 30 L41 20 L48 26Z M79 30 L79 20 L72 26Z" fill="#8a5a1c"/><path d="M48 30 L52 36 M60 26 L60 34 M72 30 L68 36" stroke="#a87a2c" stroke-width="2"/>`;
+
+  const pd=(m==='sad'||m==='worry')?1:0;
+  s+=`<ellipse cx="52" cy="57" rx="3.2" ry="2.6" fill="#fff"/><ellipse cx="68" cy="57" rx="3.2" ry="2.6" fill="#fff"/><circle cx="52.4" cy="${57+pd*.6}" r="1.8" fill="#222"/><circle cx="68.4" cy="${57+pd*.6}" r="1.8" fill="#222"/>`;
+  const bc=(T==='scarf'||T==='lion'||T==='hat'||T==='bald')?(c.beard||h):h;
+  if(m==='angry')s+=`<path d="M45 50 L57 54 M75 50 L63 54" stroke="${bc}" stroke-width="2.6" stroke-linecap="round"/><path d="M53 71 Q60 65 67 71" stroke="#5a2a22" stroke-width="2" fill="none"/>`;
+  else if(m==='sad'||m==='worry')s+=`<path d="M45 53 L57 49 M75 53 L63 49" stroke="${bc}" stroke-width="2.4" stroke-linecap="round"/><path d="M53 71 Q60 66 67 71" stroke="#5a2a22" stroke-width="2" fill="none"/>`;
+  else if(m==='smile')s+=`<path d="M46 49 Q52 46 58 49 M62 49 Q68 46 74 49" stroke="${bc}" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M52 67 Q61 75 69 66" stroke="#5a2a22" stroke-width="2.2" fill="none"/>`;
+  else s+=`<path d="M46 50 Q52 48 58 50 M62 50 Q68 48 74 50" stroke="${bc}" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M53 69 L67 69" stroke="#5a2a22" stroke-width="2" fill="none"/>`;
+  if(c.mus)s+=`<path d="M49 68 Q55 62 60 66 Q65 62 71 68 Q64 70 60 68 Q56 70 49 68Z" fill="${c.beard}"/>`;
+  return s+`</svg>`;
+}
+
+const fresh=()=>({ev:{},w:{},flags:{},topics:{},bond:0,pos:'far',visits:0,maxV:3,visited:{},dead:{},end:null,tradition:false,silent:false});
+let S=fresh();
+const NM={iolaos:'Iolaos',timon:'Timon',archias:'Archias',demetrios:'Demetrios',thea:'Thea'};
+const ENDNAMES={A:'Bezeugt',E:'Gehilfin am Rand',B1:'Das Wunder des Archias',B2:'Das Lied des Herakles',C:'Die Verrückte vom Sumpf',D:'Schuld ohne Ruhm',F:'Der Mythos, wie er war'};
+const ENDFIRST={A:'A1',E:'E1',B1:'Ba1',B2:'Bb0',C:'C1',D:'D1',F:'F1'};
+const HKNEXT={A:'A4',E:'E3',B1:'Ba3'};
+const FOUND=new Set();
+const jn=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' und '+a[a.length-1];
+const moreFolk=()=>['timon','archias','demetrios','thea','myrto'].some(k=>!S.visited[k]);
+const late=()=>!!(S.flags.waited||S.flags.late);
+const die=k=>{S.dead[k]=true;S.w[k]=false;if(k==='timon')S.flags.timonDead=true};
+const deadNames=()=>Object.keys(S.dead).filter(k=>S.dead[k]).map(k=>NM[k]);
+const anyDead=()=>deadNames().length>0;
+const btVictim=()=>{
+  if(S.pos!=='near')return null;
+  const trWill=S.w.timon&&(S.flags.torch==='timon'||late());
+  const c=[];
+  if(S.w.iolaos)c.push('iolaos');
+  if(S.w.timon&&!trWill)c.push('timon');
+  if(!c.length)return null;
+  return S.flags.torch==='iolaos'&&c.includes('iolaos')?'iolaos':c[0];
+};
+const comp=()=>Object.keys(NM).filter(k=>S.w[k]).map(k=>NM[k]);
+function TS(){
+  const w=S.w,f=S.flags;
+  const iol=!!w.iolaos&&S.bond>=1,tim=!!w.timon,dem=!!w.demetrios&&!!f.demFollowed;
+  let t=(iol?2:0)+(tim?1:0)+(dem?1:0);
+  if(S.pos==='near'&&(iol||tim)&&t>0)t+=1;
+  let need=((S.ev.zahn||S.ev.gift)?3:4)+(f.demHostile?1:0)-(S.silent?1:0);
+  if(need<1)need=1;
+  const men=['iolaos','timon','demetrios','archias'].filter(k=>w[k]);
+  return {t,need,iol,tim,dem,men};
+}
+function pickEnd(){
+  const x=TS(),f=S.flags;
+  if(!x.men.length&&!anyDead())return 'C';
+  if(anyDead()&&x.t<x.need)return 'D';
+  if(x.t>=x.need)return 'A';
+  if(x.t>=1)return 'E';
+  if(S.w.archias)return 'B1';
+  return 'B2';
+}
+const truthSp=()=>{const x=TS();return x.iol?'iolaos':x.tim?'timon':'demetrios'};
+const truthNames=()=>{const x=TS();return [x.iol&&'Iolaos',x.tim&&'Timon',x.dem&&'Demetrios'].filter(Boolean)};
+const set=k=>()=>{S.ev[k]=true};
+const P=(who,text,next,extra)=>Object.assign({sp:who,text,next},extra||{});
+const WSK=(k,next,extra)=>Object.assign({skipTo:next,skip:()=>!S.w[k]},extra||{});
+
+const ST={
+
+a1:P('n',`Lerna, am Rand des Sumpfes. Seit dem Frühling verschwinden hier Kinder, elf bisher, dazu zwei Fischer und sieben Ziegenherden. Im Schilf haust die Hydra, die vielköpfige Wasserschlange, von der die Alten nur flüstern.`,'a2',{bg:'dorf',chars:{}}),
+a2:P('kallis',`Ich bin Kallis. Ich sammle Kräuter, flicke Netze und kenne jeden Pfad durch den Sumpf. Gefragt hat mich deswegen noch nie jemand.`,'a3',{chars:{c:'kallis:neutral'}}),
+a3:P('demetrios',`Hört mich an, Leute von Lerna! König Eurystheus hat Herakles gesandt. Er wird die Hydra töten, die vielköpfige Bestie von Lerna. Das ist Männersache. Geht in eure Häuser.`,'a4',{chars:{l:'kallis:neutral',c:'demetrios:neutral',r:'thea:sad'}}),
+a4:P('thea',`Nysa ist seit drei Nächten fort, Kallis. Meine Kleine. Sie sagen, sie hätte sich verirrt.`,'a5'),
+a5:P('kallis',`Ich habe die Spuren gesehen. Keine Wölfe. Etwas Schweres hat Furchen gezogen, und im Schlamm liegen Abdrücke von mehr als einem Hals. Das ist die Hydra, und sie ist nah.`,'a6',{chars:{l:'kallis:worry',c:'demetrios:neutral',r:'thea:sad'}}),
+a6:P('demetrios',`Kallis. Der Nebel lässt Frauen Dinge sehen. Die Hydra ist Sache des Herakles. Wir warten auf ihn.`,null,{chars:{l:'kallis:angry',c:'demetrios:smile',r:'thea:sad'},choices:[
+  {t:`Ich warte auf Herakles.`,go:'w1',fx:()=>{S.flags.waited=true}},
+  {t:`Ich gehe nach Tiryns und frage ihn, wann er kommt.`,go:'t1'}]}),
+w1:P('kallis',`Ich wartete drei Tage. Am dritten Morgen fehlten zwei weitere Kinder, darunter Pelias, Timons Neffe. Die Dörfler verriegelten ihre Türen. Von Herakles kam kein Wort, nicht einmal Staub auf der Straße. Ich hatte Zeit verloren, und mit der Zeit den Mut der anderen.`,'w2',{chars:{}}),
+w2:P('n',`Am vierten Tag kam ein Reiter über die Straße: Iolaos, von seinem Onkel geschickt, um „nach dem Rechten zu sehen“. Herakles selbst kam nicht.`,'w3',{bg:'dorf',chars:{l:'kallis:sad',r:'iolaos:worry'}}),
+w3:P('iolaos',`Er will wissen, ob es wirklich so schlimm ist. Ich habe nicht lange, bevor ich zurückreiten muss. Beim König liegen Tafeln, auf denen Reisende aufschreiben ließen, was sie über solche Wesen erzählen.`,'w4'),
+w4:P('kallis',`Steht dort auch, wie man sie tötet?`,'w5'),
+w5:P('iolaos',`Hals um Hals. Wo einer fällt, wachsen zwei nach, außer man brennt den Stumpf sofort aus, mit Pech und Feuer. Der in der Mitte ist unsterblich. Den kann man nur begraben, unter etwas Schwerem.`,'w6',{fx:()=>{S.flags.fire=true;S.flags.mid=true}}),
+w6:P('iolaos',`Hier, Pech, Fackeln, ein Messer. Mehr Zeit habe ich nicht.`,'wk'),
+wk:P('n',`Er hatte kaum Zeit. Ich konnte ihn schnell abfertigen oder fragen, wie es ihm bei seinem Onkel ergeht.`,null,{chars:{l:'kallis:neutral',r:'iolaos:worry'},choices:[
+  {t:`Ihn fragen, wie es ihm bei seinem Onkel ergeht.`,go:'wk1',fx:()=>{S.bond++}},
+  {t:`Zur Sache kommen.`,go:'ia'}]}),
+wk1:P('iolaos',`Das fragt mich niemand. Danke, Kallis.`,'ia',{chars:{l:'kallis:neutral',r:'iolaos:smile'}}),
+
+t1:P('n',`Tiryns. Im Festsaal duftet es nach Braten und Lorbeer. Herakles sitzt in der Mitte, das Löwenfell über der Schulter, und ein Sänger übt schon die ersten Verse auf ihn.`,'t2',{bg:'hof',chars:{}}),
+t2:P('herakles',`Das Kräuterweib aus Lerna! Komm, setz dich. Nein, steh. Dann kannst du mir Wein nachschenken.`,'t3',{chars:{l:'kallis:neutral',c:'herakles:smile',r:'iolaos:worry'}}),
+t3:P('kallis',`Die Hydra, Herakles. Elf Kinder. Der König hat dich geschickt.`,'t4'),
+t4:P('herakles',`Ach, die Wasserschlange. Weißt du, der Löwe ist noch frisch, das Lied nicht fertig. Wenn ich jetzt in einen Sumpf steige, ist das schlecht für die Geschichte. Schlamm gibt keine gute Strophe.`,'t5'),
+t5:P('kallis',`Es sind Kinder.`,'t5b',{chars:{l:'kallis:sad',c:'herakles:smile',r:'iolaos:worry'}}),
+t5b:P('herakles',`Es sind immer irgendwelche Kinder, Schätzchen. Ich kann nicht jedes Dorf retten. Mein Name ist mein Werk.`,null,{choices:[
+  {t:`Ihn anschreien.`,go:'t6a',fx:()=>{S.flags.shout=true}},
+  {t:`Ruhig bleiben und noch einmal bitten.`,go:'t6b'}]}),
+t6a:P('kallis',`Du feiger, aufgeblasener …`,'t7a',{chars:{l:'kallis:angry',c:'herakles:smile',r:'iolaos:worry'}}),
+t7a:P('herakles',`Siehst du? Hysterisch. Genau das meine ich. Wachen! Werft sie hinaus.`,'g1'),
+t6b:P('kallis',`Bitte. Nur du kannst das. Man sagt, du seist der Stärkste der Welt.`,'t7b'),
+t7b:P('herakles',`So höflich! Das gefällt mir. Nächsten Monat, vielleicht. Iolaos, merk dir: Hydra, später. Und hol ihr einen Becher Wasser, sie sieht durstig aus.`,'t8a'),
+
+g1:P('n',`Zwei Wachen packten mich unter den Armen. Der Saal lachte, der Sänger setzte mitten im Vers neu an. Ich flog durch den Torbogen, mein Bündel hinterher.`,'g2',{chars:{}}),
+g2:P('n',`Ich saß im Dreck vor dem Tor. Ich hatte kein Pech, keine Fackeln und kein Wissen darüber, wie man etwas tötet, das mehr als einen Kopf hat. Am Fenster des Saals sah ich Iolaos stehen. Er sah weg.`,null,{bg:'dorf',choices:[
+  {t:`Vor dem Tor ausharren, bis Iolaos herauskommt. Das kostet eine ganze Nacht.`,go:'g3',fx:()=>{S.flags.gate=true}},
+  {t:`Zurück nach Lerna, mit dem Messer und dem, was ich weiß.`,go:'v1'}]}),
+g3:P('n',`Ich wartete, bis es dunkel war. Die Wachen sahen mich und taten, als sähen sie mich nicht. Dann kam Iolaos mit zwei Weinkrügen, die er in die Küche brachte, und stellte sie neben mich ab.`,'g4',{chars:{l:'kallis:sad',r:'iolaos:worry'}}),
+g4:P('iolaos',`Sprich leise. Ich habe nur den Weg vom Hof zur Küche.`,'g5'),
+g5:P('kallis',`Du kennst die Schreiber des Königs. Weiß dort irgendjemand, wie man sie tötet?`,'g6'),
+g6:P('iolaos',`Hals um Hals. Wo einer fällt, wachsen zwei nach, außer man brennt den Stumpf sofort aus, mit Pech und Feuer. Der in der Mitte ist unsterblich. Den kann man nur begraben, unter etwas Schwerem.`,'g7',{fx:()=>{S.flags.fire=true;S.flags.mid=true}}),
+g7:P('iolaos',`Hier, aus der Schmiede: Pech, Fackeln, ein Messer. Mitkommen kann ich nicht, er lässt mich nicht aus den Augen. Such dir Zeugen, Kallis. In Lerna hört man einem Mann mit Namen zu, auch wenn er nichts gesehen hat. Dir hört man nicht zu, auch wenn du alles gesehen hast.`,'v1',{chars:{l:'kallis:neutral',r:'iolaos:sad'}}),
+
+t8a:P('iolaos',`Es tut mir leid. Mein Onkel ist nicht immer so.`,'t9a',{bg:'dorf',chars:{l:'kallis:sad',r:'iolaos:worry'}}),
+t9a:P('kallis',`Doch. Immer.`,'ih'),
+ih:P('iolaos',()=>S.topics.n?`Noch etwas? Ich habe nicht lange.`:`Er vergisst mich, solange er trinkt. Aber nicht lange. Was willst du wissen?`,null,{chars:{l:'kallis:neutral',r:'iolaos:worry'},choices:()=>{
+  const c=[];
+  if(!S.topics.tablet)c.push({t:`Fragen, ob der König etwas über die Hydra weiß.`,go:'it1'});
+  if(!S.topics.hera)c.push({t:`Fragen, warum Herakles nicht geht.`,go:'ih1'});
+  if(!S.topics.self)c.push({t:`Fragen, warum er ihr überhaupt zuhört.`,go:'is1'});
+  if(!S.topics.kind)c.push({t:`Ihm für das Wasser danken und fragen, wie es ihm selbst geht.`,go:'ik1'});
+  c.push({t:`Das Gespräch beenden und ihn um etwas bitten.`,go:'ia'});
+  return c;}}),
+it1:P('iolaos',`Eurystheus' Schreiber haben aufgeschrieben, was Reisende erzählten. Neun Köpfe. Ein Atem, der das Wasser vergiftet.`,'it2',{fx:()=>{S.topics.n=1}}),
+it2:P('kallis',`Und wie tötet man sie?`,'it3'),
+it3:P('iolaos',`Hals um Hals. Wo einer fällt, wachsen zwei nach. Es sei denn, man brennt den Stumpf sofort aus, mit Pech und Feuer, bevor die Wunde sich teilt.`,'it4',{fx:()=>{S.flags.fire=true}}),
+it4:P('kallis',`Und der in der Mitte?`,'it5'),
+it5:P('iolaos',`Unsterblich, sagt die Tafel. Nicht zu töten. Nur zu begraben, unter etwas Schwerem.`,'it6',{fx:()=>{S.flags.mid=true}}),
+it6:P('iolaos',`Hier. Pech, Fackeln, ein Schmiedemesser. Ich habe es aus der Schmiede genommen.`,'ih',{fx:()=>{S.topics.tablet=1}}),
+ih1:P('iolaos',`Er hat Angst, Kallis. Nicht vor der Hydra. Davor, im Dreck gesehen zu werden, ohne zu gewinnen. Er will nur Taten, die schon fertig sind, wenn er kommt.`,'ih2',{fx:()=>{S.topics.n=1}}),
+ih2:P('kallis',`Und wenn jemand anders die Tat tut?`,'ih3'),
+ih3:P('iolaos',`Dann nimmt er sie. Er nimmt immer. Den Hirten, der ihm die Spur des Löwen zeigte, hat er im Lied nie erwähnt.`,'ih',{fx:()=>{S.topics.hera=1;S.flags.heraWarn=true}}),
+is1:P('kallis',`Und du? Warum hörst du mir zu, wenn er es nicht tut?`,'is2',{fx:()=>{S.topics.n=1}}),
+is2:P('iolaos',`Meine Mutter hat mir beigebracht zuzuhören. Mein Onkel hat mir beigebracht, es nicht zu zeigen.`,'ih',{fx:()=>{S.topics.self=1;S.bond++}}),
+ik1:P('iolaos',`Das hat mich lange niemand gefragt. Es geht mir besser, wenn jemand fragt. Danke, Kallis.`,'ih',{fx:()=>{S.topics.kind=1;S.topics.n=1;S.bond++},chars:{l:'kallis:neutral',r:'iolaos:smile'}}),
+ia:P('iolaos',`Eins noch. In Lerna wird dir niemand glauben, wenn du allein erzählst. Du brauchst Männer mit Namen, die dabei sind und es sagen. Ich könnte einer sein, wenn ich wüsste, dass es dir um mehr geht als um mein Wort. Sonst such dir andere.`,null,{chars:{l:'kallis:neutral',r:'iolaos:worry'},choices:()=>[
+  {t:`Ehrlich bitten: „Komm mit. Nicht für mich, für die Kinder. Sieh es selbst und sag es später.“`,go:S.bond>=1?'t11a':'t11d',fx:()=>{if(S.bond>=1){S.w.iolaos=true;S.bond++}}},
+  {t:`Ihn erinnern: „Du hast gesagt, du bist da. Dann sei da.“`,go:S.bond>=1?'t11b':'t11d',fx:()=>{if(S.bond>=1)S.w.iolaos=true}},
+  {t:`Nichts verlangen und gehen.`,go:'t11c'}]}),
+t11a:P('iolaos',`Ich … ja. Mein Onkel wird toben. Aber ich komme. Wir treffen uns am Sumpfrand.`,'v1',{chars:{l:'kallis:neutral',r:'iolaos:smile'}}),
+t11b:P('iolaos',`Das ist unfair. Aber gut. Ich komme, ich sehe zu, mehr verspreche ich nicht.`,'v1',{chars:{l:'kallis:angry',r:'iolaos:worry'}}),
+t11c:P('iolaos',`Pass auf dich auf, Kallis. Ich wünschte, ich wäre mutiger.`,'v1',{chars:{l:'kallis:sad',r:'iolaos:sad'}}),
+
+t11d:P('iolaos',`Du brauchst mein Wort, Kallis, aber du hast nie gefragt, wer ich bin. Ich kenne dich kaum. Such dir andere.`,'v1',{chars:{l:'kallis:sad',r:'iolaos:sad'}}),
+v1:P('kallis',()=>(S.flags.waited?`Nachdem Iolaos fort war, wusste ich, was ich brauchte: Zeugen.`:`Auf dem Heimweg wusste ich, was ich brauchte: Zeugen.`)+` Männer, die dabei sind und es sagen, wenn mir niemand glaubt. Wer nicht sieht, wie es geschieht, kann es nicht bezeugen.`+(S.flags.fire?'':` Und ich wusste nicht, wie man ein Wesen tötet, das nachwächst. Vielleicht hatte im Dorf jemand etwas gesehen.`)+` Die Nacht reicht für ${S.maxV} Gespräche${S.maxV<3?' (ich habe Zeit verloren)':''}.`,'hub',{bg:'nacht',chars:{c:'kallis:worry'},fx:()=>{S.maxV=Math.max(1,3-(S.flags.waited?1:0)-(S.flags.gate?1:0))}}),
+hub:P('n',()=>`${comp().length?'Mitkommen werden: '+jn(comp())+'.':'Noch hat sich niemand bereit erklärt.'} ${S.visits>=S.maxV?'Die Nacht ist fast vorbei.':'Gespräche in dieser Nacht: '+S.visits+' von '+S.maxV+'.'}`,null,{bg:'nacht',chars:{},skip:()=>S.visits>=S.maxV&&(S.flags.late||!moreFolk()),skipTo:'dep',choices:()=>{
+  const c=[];
+  if(S.visits<S.maxV){
+    if(!S.visited.timon)c.push({t:`Zu Timon gehen, dem Fischer, dessen Bruder im Sumpf verschwand.`,go:'tm1'});
+    if(!S.visited.archias)c.push({t:`Zu Archias gehen, dem Priester.`,go:'ar1'});
+    if(!S.visited.demetrios)c.push({t:`Zu Demetrios gehen, dem Dorfältesten.`,go:'dm1'});
+    if(!S.visited.thea)c.push({t:`Zu Thea gehen, Nysas Mutter.`,go:'th1'});
+    if(!S.visited.myrto)c.push({t:`Zu Myrto gehen, der Hebamme.`,go:'my1'});
+  }else{
+    c.push({t:`Noch eine Nacht nutzen und weitersuchen. Es wird etwas kosten.`,go:'night2',fx:()=>{S.flags.late=true;S.visits=0;S.maxV=2}});
+  }
+  c.push({t:(S.visits||S.flags.late||comp().length)?`Aufbrechen. Ich habe genug gesprochen.`:`Ohne Zeugen aufbrechen.`,go:'dep'});
+  return c;}}),
+night2:P('n',()=>`Ich ließ die Nacht verstreichen und suchte am Morgen weiter. Die Hydra hatte wieder geholt: ein Kind der Fischer. Und ${S.flags.waited?'Nysa, die schon lange im Schilf lag':'Nysa, wenn sie noch lebte'}, lag nun noch länger im kalten Wasser. Ich wusste, dass jede Nacht Folgen hat.`,'hub',{bg:'dorf',chars:{}}),
+
+tm1:P('timon',()=>S.flags.waited?`Mein Bruder Kleitos ist im Sumpf verschwunden. Und vor drei Tagen mein Neffe Pelias. Du hast gewartet, Kallis. Wir alle haben gewartet.`:`Mein Bruder Kleitos ist im Sumpf verschwunden. Alle sagen, er sei ertrunken. Ich sage: Da ist etwas.`,null,{bg:'dorf',chars:{l:'kallis:neutral',r:'timon:sad'},fx:()=>{S.visited.timon=1;S.visits++},choices:[
+  {t:`Ehrlich bitten: „Komm mit und sieh es selbst. Sag später, was du gesehen hast.“`,go:'tm2',fx:()=>{S.w.timon=true}},
+  {t:`Ihn lieber nicht in Gefahr bringen.`,go:'hub'}]}),
+tm2:P('timon',`Ich bin dabei. Aber ich warne dich: Mein Wort gilt wenig in Lerna. Ich bin nur ein Fischer.`,'hub'),
+
+ar1:P('archias',`Eine Frau, ein Sumpf, mitten in der Nacht. Ich diene den Göttern, Kallis, nicht einem Kräuterweib.`,null,{bg:'dorf',chars:{l:'kallis:neutral',r:'archias:smile'},fx:()=>{S.visited.archias=1;S.visits++},choices:[
+  {t:`Ihm den Ruhm anbieten: „Wenn du mitkommst, nennt man dich den Retter von Lerna.“`,go:'ar2',fx:()=>{S.w.archias=true}},
+  {t:`Auf der Wahrheit bestehen: „Ich brauche keinen Retter. Nur einen Zeugen.“`,go:'ar3',fx:()=>{S.flags.archiasRefused=true}},
+  {t:`Gehen.`,go:'hub'}]}),
+ar2:P('archias',`Ein Zeichen der Götter! Ich komme. Aus der Ferne, versteht sich. Ein Priester steht nicht im Schlamm.`,'hub',{chars:{l:'kallis:sad',r:'archias:smile'}}),
+ar3:P('archias',`Ein Zeuge ohne Ruhm? Das ist ein Narr, und ich bin keiner. Gute Nacht.`,'hub',{chars:{l:'kallis:angry',r:'archias:smile'}}),
+
+dm1:P('demetrios',`Kallis. Der Nebel hat dir den Kopf vernebelt. Geh schlafen. … Ich habe selbst Reusen gesehen, die kein Wolf so zerreißt. Aber wenn ich das sage, fragt der Rat, warum ich nichts getan habe.`,null,{bg:'dorf',chars:{l:'kallis:neutral',r:'demetrios:neutral'},fx:()=>{S.visited.demetrios=1;S.visits++},choices:[
+  {t:`Ihm die Führung überlassen: „Du bist der Älteste. Führe uns. Ich helfe.“`,go:'dm2',fx:()=>{S.w.demetrios=true;S.flags.lead=true}},
+  {t:`Widersprechen: „Ich führe. Ich kenne den Sumpf.“`,go:'dm3',fx:()=>{S.flags.demHostile=true}},
+  {t:`Gehen.`,go:'hub'}]}),
+dm2:P('demetrios',`Das ist vernünftig. Ich übernehme die Führung. Du folgst.`,'hub',{chars:{l:'kallis:sad',r:'demetrios:smile'}}),
+dm3:P('demetrios',`Dann sieh zu, wie du es allein erklärst, wenn es schiefgeht. Ich sage dem Rat, dass ich dich gewarnt habe.`,'hub',{chars:{l:'kallis:angry',r:'demetrios:angry'}}),
+
+th1:P('thea',`Kallis. Ich habe auf dich gewartet. Frag mich, was du willst.`,'thh',{bg:'dorf',chars:{l:'kallis:neutral',r:'thea:sad'},fx:()=>{S.visited.thea=1;S.visits++}}),
+thh:P('thea',()=>S.topics.thea?`Noch etwas?`:`Ich habe nicht viel Zeit, aber ich habe alle Zeit der Welt, wenn es um Nysa geht.`,null,{chars:{l:'kallis:neutral',r:'thea:sad'},choices:()=>{
+  const c=[];
+  if(!S.topics.sah)c.push({t:`Fragen, was sie in der Nacht gesehen hat.`,go:'thq1'});
+  if(!S.topics.how)c.push({t:`Fragen, wie es ihr geht.`,go:'thq4'});
+  if(!S.topics.ask)c.push({t:`Sie bitten, mitzukommen.`,go:'thq7'});
+  c.push({t:`Das Gespräch beenden.`,go:'hub'});
+  return c;}}),
+thq1:P('thea',`Es war Nebel, aber ich habe es gehört: ein Zischen, viele Stimmen übereinander. Am Ufer lagen Brasidas' Fischreusen, zerfetzt.`,'thq2',{fx:()=>{S.topics.thea=1;S.topics.sah=1}}),
+thq2:P('thea',`Brasidas war am Morgen dort. Er hat mit der Axt auf einen Hals eingeschlagen, der aus dem Wasser kam. Er sagt, es seien zwei nachgewachsen. Er redet nicht mehr darüber. Man hat ihn ausgelacht.`,'thq3',{fx:()=>{S.flags.regrow=true}}),
+thq3:P('kallis',`Und danach? Hat jemand versucht, die Stümpfe zu versiegeln, mit irgendetwas?`,'thq3b'),
+thq3b:P('thea',`Davon weiß hier niemand etwas, Kallis. Nur, dass die Hälse nicht aufhören.`,'thh'),
+thq4:P('thea',`Ich habe geschrien. Ich stand beim Ältesten vor der Tür und habe getobt. Er gab mir einen Becher Mohnmilch und sagte, ich sei überreizt.`,'thq5',{fx:()=>{S.topics.thea=1;S.topics.how=1}}),
+thq5:P('kallis',`Ich habe in Tiryns geschrien. Sie haben mich hinausgeworfen.`,'thq6',{skip:()=>!S.flags.shout,skipTo:'thq6'}),
+thq6:P('thea',`Als ich vor seiner Tür schrie, bekam ich Mohnmilch. Als Timon letzten Winter vor seiner Tür laut wurde, bekam er Wein und einen Platz am Tisch. Bleib ruhig, Kallis. Es ist unfair, aber es wirkt.`,'thh'),
+thq7:P('thea',`Ich komme mit. Nysa ist mein Kind. Mir hört ja keiner zu, wenn ich etwas sage, aber ich kann Fackeln halten.`,null,{chars:{l:'kallis:neutral',r:'thea:sad'},fx:()=>{S.topics.thea=1;S.topics.ask=1},choices:[
+  {t:`Sie mitnehmen.`,go:'thq8',fx:()=>{S.w.thea=true}},
+  {t:`Zu gefährlich. Bleib im Dorf.`,go:'thh'}]}),
+thq8:P('thea',`Ich halte, was du mir gibst. Und ich vergesse nichts.`,'thh',{chars:{l:'kallis:neutral',r:'thea:smile'}}),
+
+my1:P('myrto',`Kallis. Das halbe Dorf redet gegen dich, und ich habe nichts dagegen gesagt. Das war mein Fehler. Setz dich und frag, was du fragen willst.`,'myh',{bg:'dorf',chars:{l:'kallis:neutral',r:'myrto:neutral'},fx:()=>{S.visited.myrto=1;S.visits++}}),
+myh:P('myrto',()=>S.topics.m?`Noch etwas?`:`Ich habe vierzig Kinder auf die Welt geholt und seitdem so ziemlich jede Wunde im Dorf verbunden. Mich wundert nichts mehr.`,null,{chars:{l:'kallis:neutral',r:'myrto:neutral'},choices:()=>{
+  const c=[];
+  if(!S.topics.wound)c.push({t:`Fragen, ob sie Wunden kennt, die immer weiter aufgehen.`,go:'myq1'});
+  if(!S.topics.silent2)c.push({t:`Fragen, warum sie im Rat nie etwas sagt.`,go:'myq4'});
+  c.push({t:`Das Gespräch beenden.`,go:'hub'});
+  return c;}}),
+myq1:P('myrto',()=>`Ausbrennen, solange die Wunde frisch ist. Pech und glühendes Eisen. Wo man ausbrennt, wächst nichts nach.`+(S.flags.fire?` Das steht also auch auf der Tafel des Königs. Meine Großmutter wusste es, lange bevor ein Mann es aufschrieb.`:` Das hat mir meine Großmutter beigebracht. Aufgeschrieben hat sie es nie.`),'myq2',{fx:()=>{S.flags.fire=true;S.topics.wound=1;S.topics.m=1},chars:{l:'kallis:neutral',r:'myrto:smile'}}),
+myq2:P('kallis',`Und was nicht stirbt?`,'myq3',{chars:{l:'kallis:worry',r:'myrto:neutral'}}),
+myq3:P('myrto',`Das vergräbt man unter einem schweren Stein und bindet einen Knoten an den Baum daneben: dreimal herum, einmal durch, nie lösen. Dann findet es keiner mehr, und keiner gräbt es aus.`,'myh',{fx:()=>{S.flags.mid=true}}),
+myq4:P('kallis',`Warum sagst du im Rat nie etwas?`,'myq5',{fx:()=>{S.topics.silent2=1;S.topics.m=1}}),
+myq5:P('myrto',`Man fragt mich nicht. Wer nicht gefragt wird, hört irgendwann auf zu warten. Ich erzähle es lieber den Mädchen, die ich auf die Welt hole. Die vergessen es nicht.`,'myh',{chars:{l:'kallis:sad',r:'myrto:sad'}}),
+
+dep:P('n',()=>{
+  let s=`Vor dem Morgengrauen brachen wir auf.`;
+  s+=comp().length?` Mit mir gingen ${jn(comp())}.`:` Ich ging allein.`;
+  const far=['archias','demetrios'].filter(k=>S.w[k]).map(k=>NM[k]);
+  if(far.length)s+=` ${jn(far)} blieb${far.length>1?'en':''} auf dem Hügel am Rand: Männer ihres Alters stehen nicht im Schlamm.`;
+  return s;},'posq',{bg:'sumpf',chars:{}}),
+posq:P('kallis',`Wo sollen die Zeugen stehen? Wer nicht nah genug ist, sieht nur wenig. Wer nah ist, ist in Gefahr.`,null,{skip:()=>{if(!(S.w.iolaos||S.w.timon)){S.pos='far';return true}return false},skipTo:'e1',chars:{c:'kallis:worry'},choices:[
+  {t:`Dicht hinter mir: Sie sollen jede Bewegung sehen.`,go:'e1',fx:()=>{S.pos='near'}},
+  {t:`Auf dem Hügel: sicher, aber aus der Ferne.`,go:'e1',fx:()=>{S.pos='far'}}]}),
+e1:P('n',()=>`Sie stieg aus dem Wasser wie ein Haus, das aufsteht. Neun Hälse. Neun Mäuler. Ein Geruch nach Fäulnis und Metall.`+(comp().length?` Hinter mir atmete jemand scharf ein. Ich war nicht allein, und das änderte etwas.`:` Niemand sah mich an. Niemand würde bezeugen können, was jetzt geschah.`),'ewI',{bg:'kampf:9',chars:{}}),
+ewI:P('iolaos',()=>S.flags.fire?`Genau wie auf der Tafel. Nur größer.`:`Das stand auf keiner Tafel, die ich kenne.`,'ewT',WSK('iolaos','ewT')),
+ewT:P('timon',`Kleitos … Das ist es also, was dich geholt hat.`,'ewA',WSK('timon','ewA')),
+ewA:P('archias',`Die Götter prüfen euch! Geh, Weib, und sei gesegnet. Ich bete von hier aus.`,'ewTh',WSK('archias','ewTh')),
+ewTh:P('thea',`Nysa. Bitte, Nysa, sei dort.`,'dmo',WSK('thea','dmo')),
+dmo:P('demetrios',`Frontal! Alle Hälse auf einmal, im Namen des Dorfes!`,null,{skip:()=>!(S.w.demetrios&&S.flags.lead),skipTo:'nf1',choices:[
+  {t:`Seinem Befehl folgen.`,go:'dmf',fx:()=>{S.flags.demFollowed=true}},
+  {t:`Ihn ignorieren.`,go:'dmi',fx:()=>{S.flags.demIgnored=true}}]}),
+dmf:P('n',()=>{
+  let v=null;
+  if(S.pos==='near'){if(S.w.iolaos)v='iolaos';else if(S.w.timon)v='timon'}
+  S.flags.injured=v;
+  return `Ich befolgte den Befehl. Es war Unsinn. Wo ein Kopf fiel, wuchsen zwei nach. `+(v?`Ein Hals peitschte herum und riss ${NM[v]} an der Schulter auf. Er lebte, aber er blutete.`:`Die Hälse schlugen ins leere Schilf.`)+` Demetrios rief vom Hügel, es laufe nach Plan.`;
+},'nf1',{bg:'kampf:10'}),
+dmi:P('n',`Ich ignorierte ihn. Demetrios' Stimme überschlug sich: „Weib! Gehorche! Sonst erinnere ich mich vor dem Rat an nichts!“ Dann schwieg er, tief beleidigt.`,'nf1'),
+
+nf1:P('n',()=>S.flags.regrow?`Ich hatte weder Pech noch Fackeln. Thea hatte von Brasidas' Axt erzählt: Wo ein Hals fällt, wachsen zwei nach. Ich wusste, was ich nicht tun durfte, und nicht, was ich stattdessen tun sollte.`:`Ich hatte weder Pech noch Fackeln. Ich hatte ein Messer und die Annahme, dass etwas, das einen Hals hat, auch einen Hals verliert.`,null,{skip:()=>!!S.flags.fire,skipTo:'f2',bg:'kampf:9',choices:()=>{
+  const c=[{t:`Einen Hals abschlagen.`,go:'nf2'}];
+  c.push({t:`Zurückziehen, solange es noch geht.`,go:'nf3'});
+  return c;}}),
+nf2:P('n',()=>`Ich schlug zu. Wo ein Kopf gefallen war, wuchsen zwei nach. Ich schlug noch einmal. Die Hydra schlug zurück. `+(S.flags.nfv==='timon'?`Timon stürzte sich in den Kampf. Ein Hals riss ihn vom Ufer. Ich sah ihn nicht wieder.`:S.flags.nfv==='iolaos'?`Iolaos wurde an der Schulter getroffen und stürzte. Ich schleppte ihn an Land.`:`Ich floh mit zerrissener Schulter.`),'nf4',{bg:'kampf:10',fx:()=>{
+  if(S.pos==='near'&&S.w.timon){die('timon');S.flags.nfv='timon'}
+  else if(S.pos==='near'&&S.w.iolaos){S.flags.nfv='iolaos'}
+  else S.flags.nfv=null;}}),
+nf3:P('n',`Ich rief zum Rückzug. Wir verließen den Sumpf Schritt für Schritt, ohne die Hydra aus den Augen zu lassen. Niemand starb. Nichts war gewonnen.`,'nf4',{bg:'sumpf'}),
+nf4:P('n',`Hinter uns hob sich das Wasser noch einmal, dann sank es zurück. Die Bestie lebte. Es war nichts zu bezeugen, außer meinem Scheitern.`,'F1',{bg:'sumpf',chars:{},fx:()=>{S.end='F'}}),
+
+f2:P('kallis',`Jetzt das Feuer. Pech auf den Stumpf, Fackel darauf. Aber wer hält die Fackel?`,null,{bg:'kampf:9',chars:{},choices:()=>{
+  const c=[{t:`Ich allein. Pech, Fackel, Messer.`,go:'fo'}];
+  if(S.w.timon&&S.pos==='near')c.push({t:`Timon die Fackel geben.`,go:'ft'});
+  if(S.w.iolaos&&S.pos==='near')c.push({t:`Iolaos die Fackel geben.`,go:'fi'});
+  if(S.w.thea)c.push({t:`Thea die Fackel geben.`,go:'fth'});
+  return c;}}),
+fo:P('n',`Pech auf den Stumpf, Fackel darauf. Es zischte. Der Hals schloss sich und blieb still. Schlag, Feuer, Schlag, Feuer. Ich zählte, um nicht zu denken. Funken fielen auf meinen Arm und brannten sich ein.`,'bt',{bg:'kampf:5:fire',fx:set('narbe')}),
+ft:P('n',`Timon hielt die Fackel wie einen Speer. Kopf um Kopf schloss er die Wunden, die ich schlug, und er weinte dabei, ohne einen Laut.`,'bt',{bg:'kampf:5:fire',fx:()=>{S.flags.torch='timon'}}),
+fi:P('n',`Iolaos hielt die Fackel und zählte laut mit, als könnte er die Angst so festbinden. Wir waren schnell. Und zum ersten Mal sah er nicht nach seinem Onkel.`,'bt',{bg:'kampf:5:fire',fx:()=>{S.flags.torch='iolaos';S.bond++}}),
+fth:P('n',`Thea hielt die Fackel, zitternd, aber sie hielt. Kein Hals kam an ihr vorbei. Ich sah, dass sie dabei an Nysa dachte.`,'bt',{bg:'kampf:5:fire',fx:()=>{S.flags.torch='thea'}}),
+bt:P('n',()=>`Ein Hals peitschte herum und fuhr auf ${NM[btVictim()]} zu, schneller, als er ausweichen konnte.`,null,{skip:()=>!btVictim(),skipTo:'f3',bg:'kampf:5:fire',fx:()=>{S.flags.btv=btVictim()},choices:[
+  {t:`Mich dazwischenwerfen.`,go:'bt1'},
+  {t:`Weiterschlagen und sofort ausbrennen. Der Hals darf nicht nachwachsen.`,go:'bt2'}]}),
+bt1:P('n',()=>`Ich warf mich dazwischen. Der Hals erwischte meinen Arm, und das Gift brannte wie Feuer, aber ${NM[S.flags.btv]} lebte, blass und blutend.`,'f3',{fx:()=>{S.flags.hurt=true;S.flags.injured=S.flags.btv;S.ev.narbe=true}}),
+bt2:P('n',()=>`Ich schlug weiter. Der Hals riss ${NM[S.flags.btv]} vom Ufer, und als ich wieder hinsah, war das Wasser dort still. Ich brannte den Stumpf aus, weil ich es musste, und hörte nicht auf zu zählen.`,'f3',{fx:()=>{die(S.flags.btv)}}),
+f3:P('n',`Dann war nur noch einer übrig, der mittlere, dick wie ein Baumstamm, mit goldenen Augen. Ich schlug ihn ab. Er lebte weiter, auf dem Boden, und sah mich an.`,'tr',{bg:'kampf:1:fire'}),
+tr:P('n',()=>S.flags.torch==='timon'?`Timon sah den Kopf. Er sah die goldenen Augen, die seinen Bruder gesehen hatten. Er ließ die Fackel fallen und rannte los.`:`Timon sah den Kopf. Er sah die goldenen Augen, die seinen Bruder gesehen hatten, und das Kind seines Bruders. Er riss sich los und rannte.`,null,{skip:()=>!(S.pos==='near'&&S.w.timon&&(S.flags.torch==='timon'||late())),skipTo:'f4',choices:[
+  {t:`Mich auf ihn werfen und zurückreißen.`,go:'tr1',fx:()=>{S.ev.narbe=true}},
+  {t:`Ihn laufen lassen. Der Kopf muss versiegelt werden, bevor er noch jemanden holt.`,go:'tr2',fx:()=>{die('timon')}}]}),
+tr1:P('n',`Ich riss ihn zurück. Der Kopf schnappte nach mir und erwischte meinen Unterarm. Das Gift brannte wie Feuer. Timon lag keuchend im Schlamm. Er lebte.`,'f4'),
+tr2:P('n',`Ich rief seinen Namen, aber er hörte nicht. Er kniete schon vor dem Kopf, die Hände um den Hals, als wollte er ihn erwürgen. Der Kopf schnappte zu. Timon sank in den Schlamm, atmete einmal und dann nicht mehr. Ich konnte nur noch eines tun: den Kopf versiegeln, bevor er noch jemanden holte.`,'f4'),
+f4:P('kallis',()=>(S.flags.mid?`Der unsterbliche Kopf. Man hatte es mir gesagt: nicht töten. Begraben.`:`Der Kopf lebt weiter, obwohl er abgeschlagen ist. Mit Feuer ist da nichts zu machen.`)+` Ich nahm die Hebelstange und rollte den großen Fels über ihn.`,'f5',{chars:{c:'kallis:worry'}}),
+f5:P('n',()=>S.flags.timonDead?`Der Fels rollte langsam, dann schneller. Dumpf schloss sich der Boden über dem Kopf, der Timon genommen hatte. Zur Markierung knotete ich mein Netzseil um die nächste Weide, mit Händen, die nicht aufhören wollten zu zittern.`:`Der Fels rollte langsam, dann schneller. Dumpf schloss sich der Boden über dem Kopf. Zur Markierung knotete ich mein Netzseil um die nächste Weide.`,'fr',{bg:'kampf:0',fx:set('stein')}),
+fr:P('archias',`Im Namen der Götter! Dieser Fels sei gesegnet, und der Kopf unter ihm still, durch mein Gebet und die Gnade des Himmels!`,'fz1',{skip:()=>!S.w.archias,skipTo:'fz1',fx:()=>{S.flags.rite=true}}),
+fz1:P('iolaos',()=>S.flags.timonDead?`Timon! Kallis, das war nicht nötig. Ich habe dir vertraut, aber ich weiß nicht, ob ich vor dem Rat noch für dich bürgen kann.`:(S.pos==='near'?`Ich habe es gesehen, Kallis. Jedes Wort, das ich später sage, wird wahr sein.`:`Von hier sah ich Rauch und Schatten. Aber dich sah ich bis zuletzt.`),'fz2',{skip:()=>!S.w.iolaos,skipTo:'fz2',fx:()=>{if(S.flags.timonDead)S.bond=Math.max(0,S.bond-1)}}),
+fz2:P('timon',()=>S.pos==='near'?`Kleitos … Er ist gerächt. Und ich habe es gesehen.`:`Ich habe es vom Hügel gesehen. Mehr sage ich später.`,'fz3',WSK('timon','fz3')),
+fz3:P('thea',`Es ist vorbei. Nysa … wo ist Nysa?`,'fz4',WSK('thea','fz4')),
+fz4:P('demetrios',()=>S.flags.demFollowed?`Unter meiner Führung! Hat das jeder gesehen?`:S.flags.demIgnored?`Sie hat meinen Befehl missachtet. Es ist geschehen, aber wie gesagt: Ich erinnere mich an nichts.`:`Es ist vollbracht.`,'ev1',WSK('demetrios','ev1')),
+ev1:P('kallis',`Meine Knie zitterten. Ich wusste schon, wie das klingen würde, wenn ich es erzähle. Ich brauchte etwas, das man anfassen kann.`,null,{chars:{c:'kallis:sad'},choices:()=>{
+  const c=[
+    {t:`Einen Fangzahn ausbrechen.`,go:'nys',fx:set('zahn')},
+    {t:`Die Giftdrüse bergen.`,go:'nys',fx:set('gift')}];
+  if(!S.flags.hurt)c.push({t:`Beides. Das kostet Zeit und Kraft.`,go:'nys',fx:()=>{S.ev.zahn=true;S.ev.gift=true}});
+  c.push({t:S.w.iolaos||S.w.timon||S.w.demetrios||S.w.archias?`Nichts. Ich habe Zeugen.`:`Nichts. Dafür bleibt keine Zeit.`,go:'nys'});
+  return c;}}),
+nys:P('n',()=>late()?`Aus dem Schilf kam kein Wimmern mehr, nur ein Atmen. Nysa. Sie glühte vor Fieber, die Augen halb offen, und sagte kein Wort. Ich nahm sie auf den Arm und trug sie heim.`:`Aus dem Schilf kam ein Wimmern. Nysa. Am Leben, durchgefroren. Ich nahm sie auf den Arm und trug sie heim.`,'r1',{fx:set('nysa')}),
+
+r1:P('n',()=>`Das ganze Dorf stand auf dem Platz, als wir im Morgenlicht aus dem Nebel kamen, ein Kind auf meinem Arm.`+(comp().length?` Hinter mir gingen ${jn(comp())}.`:''),'r2',{bg:'morgen',chars:{}}),
+r2:P('thea',()=>late()?`Nysa! Nysa, sieh mich an! … Warum sagt sie nichts?`:`Nysa! Nysa!`,'r3',{chars:()=>({l:'thea:'+(late()?'sad':'smile'),c:'kallis:neutral',r:'nysa:'+(late()?'sad':'smile')})}),
+r3:P('kallis',`Die Hydra ist tot.`,'r4',{chars:{l:'thea:smile',c:'kallis:neutral',r:'kleon:smile'}}),
+r4:P('kleon',`Gut, gut. Und jetzt leg dich hin, Kallis. Du bist fiebrig.`,'r5',{}),
+r5:P('kallis',`Kleon hatte „fiebrig“ gesagt, bevor ich den Mund aufgemacht hatte. Hinter mir standen Männer, die dabei gewesen waren. Wenn sie sprachen, würde man zuhören. Aber dann wären es ihre Worte.`,null,{skip:()=>!TS().men.length,skipTo:'r5b',chars:{l:'thea:sad',c:'kallis:worry'},choices:[
+  {t:`Selbst sprechen und die Beweise zeigen.`,go:'r5b'},
+  {t:`Schweigen und die Zeugen sprechen lassen. Dann hört man ihnen eher zu.`,go:'pr',fx:()=>{S.silent=true}}]}),
+r5b:P('kallis',`Ich habe Beweise.`,'pz',{chars:{l:'kallis:angry',c:'brasidas:smile',r:'kleon:smile'}}),
+
+pz:P('kallis',`Ein Fangzahn. Aus dem Maul der Hydra. Fasst ihn an.`,'pz2',{skipTo:'pg',skip:()=>!S.ev.zahn,chars:{l:'kallis:angry',c:'brasidas:smile',r:'kleon:smile'}}),
+pz2:P('brasidas',`Ein Fischknochen. Hab ich zu Hause zehn Stück.`,'pg'),
+pg:P('kallis',`Das Gift. Seht, wie es das Holz zerfrisst.`,'pg2',{skipTo:'pn',skip:()=>!S.ev.gift}),
+pg2:P('kleon',`Ein Gebräu, Kallis, aus deiner Kräuterküche. Fieberträume, giftige Dämpfe. Sehr verständlich.`,'pn'),
+pn:P('kallis',`Seht meinen Arm. Das war das Feuer, mit dem ich die Hälse verschloss.`,'pn2',{skipTo:'ps',skip:()=>!S.ev.narbe}),
+pn2:P('brasidas',`Ein Herdunfall. Frauen und Feuer, das kennt man.`,'ps'),
+ps:P('kallis',`Im Sumpf liegt ein Fels über dem unsterblichen Kopf. Mein Netzseil hängt an der Weide daneben. Geht hin und seht!`,'ps2',{}),
+ps2:P('kleon',`In den Sumpf? Wegen eines Steins? Im Sumpf liegen viele Steine.`,'py'),
+py:P(()=>late()?'n':'nysa',()=>late()?`Nysa lag in meinen Armen, glühend. Sie konnte nichts sagen. Seit dem Sumpf hatte sie kein Wort gesprochen.`:`Kallis hat mich gerettet! Die Schlange hatte so viele Köpfe!`,'py2',{chars:{l:'kallis:worry',c:'nysa:sad',r:'brasidas:smile'}}),
+py2:P('brasidas',()=>late()?`Das Kind sagt ja nicht einmal etwas. Und die Frau redet für beide.`:`Das Kind steht unter Schock. Wir sollten ihm nicht zu viel glauben. Der Frau übrigens auch nicht.`,'py3',{chars:{l:'thea:sad',c:'nysa:sad',r:'brasidas:smile'}}),
+py3:P('thea',`Ich glaube euch beiden!`,'py4'),
+py4:P('kleon',`Thea, du bist ihre Freundin. Du redest ihr zuliebe.`,'pend',{chars:{l:'thea:sad',c:'kleon:smile'}}),
+pend:P('kallis',()=>{const l=[S.ev.zahn&&'den Zahn',S.ev.gift&&'das Gift',S.ev.narbe&&'den Arm'].filter(Boolean);return l.length?`Ich legte ihnen alles hin. Sie schauten auf den Boden, auf ${jn(l)}, nur nicht mich an. Als wäre es mein Fehler, dass es da lag.`:`Ich hatte nichts zum Anfassen, nur Worte. Sie schauten auf den Boden und wussten schon vorher, was sie davon hielten.`},'pr',{chars:{c:'kallis:sad'}}),
+pr:P(()=>S.w.demetrios?'kleon':'demetrios',()=>S.w.demetrios?`Dann gehört das vor den Rat, auf der Stelle. Wer war dabei? Wer hat es gesehen? Männer, meine ich.`:`Der Rat tagt. Ein Ereignis dieser Größe gehört vor den Rat, mit Zeugen. Männern von Ansehen.`,'pr2',{nextFn:()=>S.w.demetrios?'wI':'pr2',bg:'rat',chars:()=>S.w.demetrios?{l:'kallis:sad',c:'demetrios:neutral',r:'kleon:neutral'}:{l:'demetrios:neutral',c:'kallis:sad',r:'kleon:neutral'}}),
+pr2:P('kleon',`Wer war dabei? Wer hat es gesehen? Männer, meine ich.`,'wI'),
+wI:P('iolaos',()=>TS().iol?`Ich war dabei. Ich habe alles gesehen.`:`Ich … war dabei. Aber Timon musste nicht sterben, und ich weiß nicht, ob ich dafür bürgen kann.`,'wIr',{skipTo:'wT',skip:()=>!S.w.iolaos,chars:{l:'kallis:sad',c:'iolaos:worry',r:'kleon:neutral'}}),
+wT:P('timon',`Ich auch. Ich stand am Sumpf. Ich habe gesehen, was dort geschah.`,'wTr',{skipTo:'wA',skip:()=>!S.w.timon,chars:{l:'kallis:sad',c:'timon:neutral',r:'kleon:neutral'}}),
+wA:P('archias',`Auch ich war zugegen, als Diener der Götter. Es war ein Zeichen.`,'wAr',{skipTo:'wD',skip:()=>!S.w.archias,chars:{l:'kallis:sad',c:'archias:smile',r:'kleon:neutral'}}),
+wD:P('demetrios',()=>S.flags.demIgnored?`Ich erinnere mich nicht genau. Es war Nebel, und ich stand weit weg. Mehr kann ich dem Rat nicht sagen.`:`Der Zug stand unter meiner Führung. Das sollte festgehalten werden.`,'wDr',{skipTo:'wdead',skip:()=>!S.w.demetrios,chars:{l:'kallis:sad',c:'demetrios:smile',r:'kleon:neutral'}}),
+wIr:P(()=>TS().iol?'demetrios':'kleon',()=>TS().iol?`Der Neffe des Herakles. Sein Wort hat Gewicht im Rat.`:`Der Neffe sagt, was sein Onkel nicht widerlegt. Das beweist wenig.`,'wT',{skip:()=>!S.w.iolaos,skipTo:'wT',chars:{l:'kallis:sad',c:'iolaos:worry',r:'kleon:neutral'}}),
+wTr:P('kleon',`Ein Fischer, dessen Bruder im Sumpf starb. So einer sieht überall Ungeheuer.`,'wA',{skip:()=>!S.w.timon,skipTo:'wA',chars:{l:'kallis:sad',c:'timon:sad',r:'kleon:neutral'}}),
+wAr:P('demetrios',`Ein Diener der Götter. Seine Worte wiegen. Aber was sah er außer dem Walten des Himmels?`,'wD',{skip:()=>!S.w.archias,skipTo:'wD',chars:{l:'kallis:sad',c:'archias:smile',r:'demetrios:neutral'}}),
+wDr:P('kleon',()=>S.flags.demIgnored?`Der Älteste erinnert sich nicht genau. Wer sich nicht erinnert, beweist nichts.`:`Der Älteste spricht von seinem Zug. Von der Frau sagt er wenig.`,'wdead',{skip:()=>!S.w.demetrios,skipTo:'wdead',chars:{l:'kallis:sad',c:'demetrios:smile',r:'kleon:neutral'}}),
+wdead:P('kallis',()=>`${jn(deadNames())} ${deadNames().length>1?'haben':'hat'} es gesehen. Ich sage, was ${deadNames().length>1?'sie mir':'er mir'} gesagt ${deadNames().length>1?'haben':'hat'}, Wort für Wort.`,'wdeadr',{skip:()=>!anyDead(),skipTo:'wM',chars:{l:'kallis:sad',r:'kleon:neutral'}}),
+wdeadr:P('kleon',()=>`Die Worte ${deadNames().length>1?'von Toten':'eines Toten'}, aus dem Mund einer Frau. Wir hören Zeugen, keine Echos.`,'wM',{chars:{l:'kallis:angry',r:'kleon:smile'}}),
+wM:P('myrto',`Ich habe Kallis' Arm gesehen, gleich als sie aus dem Nebel kam. Frisch verbrannt. Und das Gift roch nach Sumpf.`,'wMr',{skip:()=>!(S.visited.myrto&&S.ev.narbe),skipTo:'rf',chars:{l:'kallis:sad',c:'myrto:neutral',r:'kleon:neutral'}}),
+wMr:P('kleon',`Die Hebamme verbindet Wunden. Was die Wunde gemacht hat, weiß sie nicht. Und Frauen reden gern für Frauen.`,'rf',{chars:{l:'kallis:angry',c:'myrto:sad',r:'kleon:smile'}}),
+rf:P(()=>S.flags.demHostile?'demetrios':'archias',()=>S.flags.demHostile?`Ich habe das Weib gewarnt. Ich hielt das für einen Fiebertraum. Der Rat sollte das bedenken.`:`Ich wurde gefragt und lehnte ab. Ein Zeuge, der keinen Ruhm will, hat meist einen Grund.`,'verd',{skipTo:'verd',skip:()=>!(S.flags.demHostile||(S.flags.archiasRefused&&!S.w.archias)),chars:()=>({l:'kallis:angry',c:(S.flags.demHostile?'demetrios':'archias')+':smile'})}),
+verd:P('n',()=>{const x=TS();return (x.men.length?`Der Rat musterte die, die hinter mir standen. Gewogen wurde nicht, was sie gesehen hatten. Sondern wer sie waren.`:`Hinter mir stand niemand, der etwas gesehen hatte, außer einer Frau und einem Kind. Der Rat wog, was das wert war.`)+(S.silent?` Ich hielt den Mund. Das machte es leichter.`:'')+(S.flags.demHostile?` Der Älteste hatte sich gegen mich gestellt. Das machte es schwerer.`:'')},null,{bg:'rat',chars:{l:'kallis:sad'},fx:()=>{S.end=pickEnd()},nextFn:()=>ENDFIRST[S.end]}),
+
+HK:P('n',`Da öffneten sich die Türen. Fanfaren. Ein Herold trat ein, dann Herakles: sauber, gekämmt, ohne einen einzigen Schlammspritzer. Der Rat sprang auf.`,null,{bg:'morgen',chars:{l:'herakles:smile',c:'herold:neutral'},nextFn:()=>HKNEXT[S.end]}),
+
+A1:P('demetrios',()=>`Der Rat hat gehört. ${jn(truthNames())} ${truthNames().length>1?'bezeugen':'bezeugt'} dasselbe: Kallis von Lerna hat die Hydra erschlagen. So wird es festgehalten.`,'A2',{bg:'rat',chars:()=>({l:'kallis:sad',c:'demetrios:neutral',r:truthSp()+':neutral'})}),
+A2:P('brasidas',()=>`Wenn ein Mann das sagt … dann zeig ${S.ev.zahn?'den Zahn':S.ev.gift?'das Gift':'uns, was du hast'}, Kallis. Und diesmal hören wir zu.`,'A3',{}),
+A3:P('kallis',()=>S.silent?`Ich sagte nichts. Das war der Plan. Es schmerzte, wie gut er funktionierte.`:(S.ev.zahn?`Derselbe Zahn. `:S.ev.gift?`Dasselbe Gift. `:``)+`Dieselben Worte wie am Morgen. Diesmal nickte der Rat schon beim ersten Satz.`,'A3a',{chars:{l:'kallis:sad',c:'brasidas:neutral'}}),
+A3a:P('archias',`Die Götter haben ihre Hand geführt, Ehrenwerte. Ich habe den Fels gesegnet. Das sollte nicht vergessen werden.`,'A3b',{skipTo:'A3b',skip:()=>!S.w.archias,chars:{l:'kallis:sad',c:'archias:smile'}}),
+A3b:P('n',()=>`${jn(deadNames())} ${deadNames().length>1?'hätten':'hätte'} hier stehen sollen. `+(S.dead.timon?`Der Rat nickte, als Timons Frau aufstand und still den Namen ihres Mannes in den Saal sagte. `:``)+`${deadNames().length>1?'Sie':'Ihn'} zu verlieren, war der Preis dafür gewesen, dass man mir glaubte.`,'HK',{skip:()=>!anyDead(),skipTo:'HK'}),
+A4:P('herakles',`Ich hörte, die Hydra sei tot! Ich bin so stolz auf euer Dorf. Ich hatte Iolaos genau dafür vorbereitet.`,'A5',{chars:{l:'herakles:smile',r:'herold:neutral'}}),
+A5:P(()=>truthSp(),()=>{const s=truthSp();return s==='iolaos'?`Onkel, du warst nicht dort. Ich war es. Es war Kallis.`:s==='timon'?`Herr Herakles, ich stand am Sumpf. Ihr nicht. Es war Kallis.`:`Herr Herakles, ich war dabei. Ihr nicht. Die Frau hat die Hydra erschlagen.`},'A6',{chars:()=>({l:'herakles:angry',c:truthSp()+':neutral',r:'herold:neutral'})}),
+A6:P('herakles',()=>S.flags.heraWarn?`Natürlich, natürlich. Ich habe sie beflügelt. Das ist doch das Wesentliche.`:`Natürlich, natürlich. Ich habe sie beflügelt. Das ist doch das Wesentliche. Das Lied wird meinen Namen nennen.`,'A7',{chars:{l:'herakles:smile',r:'herold:neutral'}}),
+A7:P('herold',()=>S.silent?`Auf der Tafel steht: „Zweite Tat: die Hydra. Bezwungen von den Männern von Lerna: ${jn(truthNames())}, mit Hilfe der Kräuterfrau Kallis.“`+(S.w.archias?` Gesegnet von Archias.`:''):`Auf der Tafel steht: „Zweite Tat: die Hydra. Bezwungen von Kallis von Lerna. Bezeugt von ${jn(truthNames())}.“`+(S.w.archias?` Gesegnet von Archias.`:''),'A8',{chars:{l:'herakles:angry',r:'herold:neutral'}}),
+A8:P('kallis',()=>S.silent?`Man glaubte uns. Und aus „uns“ wurde schnell „sie“, und aus „sie“ „die Männer“. Ich hatte gewusst, dass es so kommen konnte. Ich hatte es gewählt, weil es sonst gar nichts gegeben hätte.`:`Man glaubte mir. Brasidas nahm den Zahn in die Hand, den er am Morgen nicht hatte anfassen wollen, und drehte ihn lange im Licht. Ich sagte danke und meinte es nur halb.`,'A9',{chars:{c:'kallis:neutral'}}),
+A9:P('n',`ENDE`,null,{end:()=>S.silent?'Bezeugt, aber überschrieben':'Bezeugt',chars:{}}),
+
+E1:P('demetrios',`Das genügt dem Rat nicht. Wir hören die Zeugen an, aber entscheiden werden wir, sobald Herakles gesprochen hat.`,'E1b',{bg:'rat',chars:()=>({l:'kallis:sad',c:'demetrios:neutral',r:truthSp()+':worry'})}),
+E1b:P('kallis',()=>S.silent?`Ich sagte nichts. Er sprach für mich, und der Rat sah ihn an, nicht mich.`:`Ich legte meine Beweise auf den Tisch. Sie sahen sie an, aber sie sahen vor allem die Männer, die für mich sprachen.`,'E2',{chars:()=>({l:'kallis:sad',c:truthSp()+':worry',r:S.w.archias?'archias:smile':'brasidas:smile'})}),
+E2:P(()=>S.w.archias?'archias':'brasidas',()=>S.w.archias?`Ich war ebenfalls dort, und ich sah vor allem das Walten der Götter. Wer könnte da sagen, wer die Fackel hielt?`:`Das reicht nicht, und gegen den Namen des Herakles schon gar nicht.`,'HK'),
+E3:P('herakles',`Eine Gehilfin. Sicher. Sie hat Fackeln gehalten, ich habe geführt. In Gedanken, aber geführt.`,'E4',{chars:{l:'herakles:smile',r:'herold:neutral'}}),
+E4:P('demetrios',`Wir halten fest: Herakles bezwang die Hydra, mit Hilfe der Kräuterfrau Kallis.`,'E5',{chars:{l:'herakles:smile',c:'demetrios:smile',r:'herold:neutral'}}),
+E5:P('kallis',`Mit Hilfe. Ich hatte jeden Hals verbrannt. Mein Name stand auf der Tafel, in der letzten Zeile, klein.`,'epi',{chars:{c:'kallis:sad'}}),
+
+Ba1:P('demetrios',`Archias, Diener der Götter, berichtet: Die Götter haben die Bestie niedergeworfen. Das Weib habe nur Fackeln getragen.`,'Ba2',{bg:'rat',chars:{l:'kallis:angry',c:'demetrios:neutral',r:'archias:smile'}}),
+Ba2:P('brasidas',`Der Fels trägt sein Zeichen. Es stimmt!`,'HK'),
+Ba3:P('herakles',`Die Götter? Ich war es! Ich hatte Iolaos vorbereitet!`,'Ba4',{chars:{l:'herakles:angry',c:'archias:angry',r:'herold:neutral'}}),
+Ba4:P('archias',`Mein Gebet hat die Bestie gefällt!`,'Ba5'),
+Ba5:P('demetrios',`Gebet und Faust. Wir halten fest: Herakles erschlug sie, Archias segnete den Fels.`,'Ba6',{chars:{l:'herakles:smile',c:'demetrios:neutral',r:'archias:smile'}}),
+Ba6:P('kallis',`Zwei Männer stritten um ein Werk, das keiner von beiden getan hatte. Ich stand dazwischen, mit dem Geruch von Pech an den Händen. Niemand bat mich, den Streit zu schlichten.`,'epi',{chars:{c:'kallis:sad'}}),
+
+Bb0:P('demetrios',`Der Rat sieht keinen Beweis, der schwerer wiegt als ein Gerücht. Wir vertagen.`,'Bb1',{bg:'rat',chars:{l:'kallis:sad',c:'demetrios:neutral',r:'kleon:smile'}}),
+Bb1:P('n',`Der Rat hatte sich noch nicht erhoben, als die Fanfaren kamen. Die Türen öffneten sich, ein Herold trat ein, dann Herakles: sauber, gekämmt, ohne einen einzigen Schlammspritzer.`,'Bb2',{bg:'morgen',chars:{l:'herakles:smile',c:'herold:neutral'}}),
+Bb2:P('herakles',`Ich hörte, die Hydra sei tot! Ich hatte meinen Neffen genau dafür vorbereitet.`,'Bb3',{}),
+Bb3:P('herakles',()=>S.w.iolaos?`Nicht wahr, mein Junge? Es war mein Plan.`:`Und Demetrios, du hast es doch gesehen. Mein Plan.`,'Bb4',{chars:()=>({l:'herakles:smile',c:(S.w.iolaos?'iolaos':'demetrios')+':worry',r:'kallis:sad'})}),
+Bb4:P(()=>S.w.iolaos?'iolaos':'demetrios',()=>S.w.iolaos?`… Ja, Onkel. Dein Plan.`:`Ich erinnere mich nicht genau. Ich führte den Zug, glaube ich. Herakles hat uns beflügelt, und das Weib folgte.`,'Bb5',{}),
+Bb5:P('kallis',()=>S.flags.heraWarn?`Er hatte den Zahn nicht angesehen. Iolaos hatte es gesagt: Er nimmt immer.`:`Er hatte den Zahn nicht angesehen. Er hatte nicht gefragt, wie. Nicht einmal, wo.`,'Bb6',{chars:{l:'herakles:smile',c:'kallis:sad'}}),
+Bb6:P('herakles',`Und du, Kräuterweib, hast so tapfer geholfen. Ich schicke dir einen Krug Öl.`,'epi',{chars:{l:'herakles:smile',c:'kallis:angry'}}),
+
+C1:P('archias',`Zeugen? Eine Mutter und ihr Kind. Beide reden, wie es ihnen ums Herz ist.`,'C1b',{bg:'rat',chars:{l:'kallis:angry',c:'archias:smile',r:'demetrios:neutral'}}),
+C1b:P('thea',`Ich habe Kallis mit dem Kind kommen sehen. Sie sagt die Wahrheit!`,'C2',{chars:{l:'kallis:angry',c:'thea:sad',r:'archias:smile'}}),
+C2:P('archias',`Kräuterfieber. Man legt sie in ihr Haus, damit sie ruht. Zu ihrem Besten.`,'C3',{chars:{l:'kallis:angry',c:'archias:smile',r:'demetrios:neutral'}}),
+C3:P('demetrios',`Sorgt dafür, dass sie sich nichts antut.`,'C4'),
+C4:P('n',()=>`Sie schlossen die Tür von außen. Am Abend hörte ich Fanfaren und Jubel. Herakles war gekommen und hatte die Hydra bezwungen. Er hatte einen Zahn bei sich.` + (S.ev.zahn?` Archias hatte meinen als „Gabe an die Götter“ eingezogen.`:``) + ` Wo er ihn her hatte, fragte niemand.`,'epi',{bg:'dorf',chars:{}}),
+
+D1:P('n',()=>(TS().men.length?`Der Rat hatte gehört, was die zu sagen hatten, die geblieben waren. `:`Der Rat hatte mich angehört. `)+`Es genügte nicht. `+(S.dead.timon?`Dann trat Timons Frau in den Saal, ohne dass jemand sie gerufen hatte.`:`Dann meldete ein Bote, dass Iolaos, der Neffe des Herakles, nicht zurückgekehrt war.`),'D1b',{bg:'rat',chars:{l:'kallis:sad'}}),
+D1b:P('n',()=>S.dead.timon?`Sie sagte nur: „Er ist nicht zurückgekommen.“ Und Kleon antwortete, bevor ich den Mund aufmachen konnte: „Weil sie ihn dorthin geführt hat.“`:`Und Kleon sagte, bevor ich den Mund aufmachen konnte: „Der Neffe des Helden ist tot, und sie steht hier.“`,'D2'),
+D2:P('kleon',()=>`Du hast ${jn(deadNames())} in den Sumpf gelockt, Kallis. Ihr Kräuterweiber und eure Pläne.`,'D3',{chars:{l:'kallis:angry',c:'kleon:angry'}}),
+D3:P('kallis',()=>S.dead.timon?`Er wollte es. Er hat seinen Bruder gesucht.`:`Er kam freiwillig. Er wollte, dass man erfährt, was geschehen ist.`,'D3b'),
+D3b:P(()=>S.w.iolaos?'iolaos':S.w.timon?'timon':S.w.demetrios?'demetrios':'archias',()=>S.w.iolaos?`Sie sagt die Wahrheit. Ich war dabei. Niemand hat ${jn(deadNames())} gezwungen mitzukommen.`:S.w.timon?`Sie sagt die Wahrheit. Ich stand am Sumpf. Niemand hat ${jn(deadNames())} gezwungen mitzukommen.`:S.w.demetrios?(S.flags.demIgnored?`Ich erinnere mich nicht genau. Nur, dass der Mann zu nah stand und das Weib ihn hätte halten können.`:`Ich habe den Zug geführt. Der Mann stand zu nah. Aber das Weib hätte ihn halten können.`):`Ich sah einen Mann sterben. Ob die Götter es so wollten oder diese Frau, kann ich nicht sagen.`,'D3c',{skip:()=>!TS().men.length,skipTo:'D4',chars:()=>({l:'kallis:sad',c:(S.w.iolaos?'iolaos':S.w.timon?'timon':S.w.demetrios?'demetrios':'archias')+':worry',r:'kleon:angry'})}),
+D3c:P('kleon',()=>`${deadNames().length>1?'Zwei Männer sind':'Ein Mann ist'} tot. Und ihr hört auf Worte, die ${deadNames().length>1?'sie':'ihn'} nicht zurückbringen. Der Rat hat genug gehört.`,'D4',{chars:{l:'kallis:sad',c:'kleon:angry'}}),
+D4:P('demetrios',`Du verlässt Lerna bis zum Frühling.`,'D5',{chars:{l:'kallis:sad',c:'demetrios:neutral'}}),
+D5:P('n',()=>`Am nächsten Tag zog Herakles ein, mit Fanfaren. `+(S.dead.iolaos?`Er trauerte öffentlich um seinen Neffen und ließ ihn ins Lied aufnehmen: gefallen an der Seite des Helden. `:``)+`Er hatte die Bestie getötet, an der ${jn(deadNames())} gestorben ${deadNames().length>1?'waren':'war'}. So erzählte man es. Ich packte mein Bündel.`,'epi',{chars:{}}),
+F1:P('n',()=>`Ich kam ohne Sieg zurück. Die Hydra lebte. Der Rat musste nichts erfinden: Es genügte, dass ich zurückgekommen war und sie nicht besiegt hatte.`+(anyDead()?` ${jn(deadNames())} kam nicht zurück.`:''),'F2',{bg:'morgen',chars:{l:'kallis:sad'}}),
+F2:P('kleon',`Sie ist hineingegangen und hat die Bestie wütend gemacht. Seht, was sie angerichtet hat.`,'F2b',{chars:{l:'kallis:sad',c:'kleon:angry'}}),
+F2b:P(()=>['iolaos','timon','demetrios','archias'].find(k=>S.w[k]),`Sie hat es versucht. Keiner von uns wusste, dass die Hälse nachwachsen.`,'F2c',{skip:()=>!TS().men.length,skipTo:'F3',chars:()=>({l:'kallis:sad',c:['iolaos','timon','demetrios','archias'].find(k=>S.w[k])+':worry',r:'kleon:angry'})}),
+F2c:P('kleon',()=>`Versucht. ${anyDead()?jn(deadNames())+' ist tot.':'Und elf Kinder sind trotzdem fort.'}`,'F3',{chars:{l:'kallis:sad',c:'kleon:angry'}}),
+F3:P('demetrios',`Das ist Männersache. Herakles wird kommen, wenn die Zeit reif ist.`,'F3b',{chars:{l:'kallis:sad',c:'demetrios:neutral'}}),
+F3b:P('kallis',`Die Hälse wachsen nach, wenn man sie nicht ausbrennt. Ich habe es gesehen.`,'F3c',{chars:{l:'kallis:angry',c:'demetrios:neutral'}}),
+F3c:P('demetrios',`Und wo hast du das gelernt, im Schilf? Geh heim, Kallis.`,'F4'),
+F4:P('n',`Zwei Wochen später kam Herakles nach Lerna. Iolaos ging neben ihm, mit einem Bündel Fackeln, die er, wie er sagte, in einer Schriftrolle gefunden hatte. Sie brannten der Hydra Hals um Hals aus. Man baute Herakles einen Altar.`,'F4b',{bg:'dorf',chars:{}}),
+F4b:P('iolaos',`Dein Weg durch das Schilf, Kallis, deine Spuren bis zum Nest. Ich habe es ihm als Plan verkauft, damit er geht. Es war das Einzige, was ich tun konnte.`,'F5',{chars:{l:'kallis:sad',r:'iolaos:sad'}}),
+F5:P('kallis',()=>S.flags.shout&&!S.flags.gate?`Iolaos hatte gewusst, wie man sie tötet. Ich hatte ihn nicht gefragt. Ich hatte geschrien, und man hatte mich hinausgeworfen. Er tat es erst, als es sicher war und jemand zusah.`:`Iolaos hätte es mir gesagt. Ich hatte nicht gefragt, was der König über die Hydra wusste. Ich hatte geglaubt, ein Messer reiche.`,'epi',{chars:{c:'kallis:sad'}}),
+
+epi:P('n',()=>({E:`Nacht in Lerna. Der Sänger übte die neue Strophe: „… mit Hilfe der Kräuterfrau.“ Ich hatte Hilfe geleistet.`,B1:`Nacht in Lerna. Zwei Männer stritten noch um den Ruhm, als ich ging.`,B2:`Nacht in Lerna. Herakles feierte im Haus des Ältesten. Wir saßen am Feuer am Dorfrand.`,C:late()?`Man hatte mir die Tür verriegelt. Durch den Spalt schob Nysa ein Stück Brot. Sie sagte nichts. Ihre Hand zitterte noch vom Fieber.`:`Man hatte mir die Tür verriegelt. Durch den Spalt schob Nysa ein Stück Brot und flüsterte.`,D:`Am Dorfrand, mit meinem Bündel, begleiteten mich Thea und Nysa bis zum letzten Stein.`,F:`Nacht in Lerna. Man sang schon von Iolaos' Fackeln und vom Helden. Von mir fiel nur der Name des Sumpfes.`})[S.end],'epi1',{bg:'nacht',chars:{l:'kallis:sad',c:'thea:neutral',r:'nysa:neutral'}}),
+epi1:P('brasidas',()=>S.end==='F'?`Meine Axt, Kallis. Zwei Hälse für einen. Ich habe es damals gesagt, und man hat gelacht. Seitdem schweige ich. Ich hätte dich warnen können, laut.`:`Ich war am Morgen am Fels. Dein Netzseil hängt an der Weide. Ich habe den Stein angefasst: nass, und er riecht nach Pech.`,'epi1b',{skip:()=>S.end==='C'||S.end==='D',skipTo:'epi2',chars:{l:'kallis:sad',c:'brasidas:neutral'}}),
+epi1b:P('kallis',`Und im Rat?`,'epi1c'),
+epi1c:P('brasidas',`Im Rat hat Kleon gelacht, und ich habe mitgelacht. Das tut mir seitdem leid. Gesagt habe ich es trotzdem nicht. Das ist schlimmer.`,'epi2'),
+epi2:P(()=>late()?'thea':'nysa',()=>late()?`Nysa kann nicht fragen, Kallis. Also frage ich für sie: Warum haben sie dir nicht geglaubt?`:`Kallis, warum haben sie dir nicht geglaubt?`,'epi3',{chars:{l:'kallis:sad',c:'thea:neutral',r:'nysa:neutral'}}),
+epi3:P('kallis',()=>S.end==='F'?`Sie haben mir geglaubt, dass ich gescheitert bin. Das hat gereicht.`:`Weil sie es nicht hören wollten. Nicht, weil es nicht stimmt.`,'epi4'),
+epi4:P('thea',`Ich habe dir vom ersten Augenblick an geglaubt.`,'epi4b',{chars:{l:'kallis:sad',c:'thea:smile',r:'nysa:neutral'}}),
+epi4b:P('myrto',`Wir Frauen von Lerna haben nie viel aufgeschrieben. Wir haben es einander erzählt. Bring Nysa zu mir, ich zeige ihr, was meine Großmutter mir zeigte. Und sie erzählt es weiter.`,'epi5',{skip:()=>!S.visited.myrto,skipTo:'epi5',chars:{l:'kallis:sad',c:'myrto:smile',r:'nysa:neutral'}}),
+epi5:P('kallis',`Das hat mir mehr geholfen, als du denkst. Aber es hat die Lieder nicht geändert.`,null,{chars:{l:'kallis:neutral',c:'thea:smile',r:'nysa:neutral'},choices:[
+  {t:`Nysa die ganze Geschichte erzählen, jedes Wort, jeden Knoten, und sie bitten, sie weiterzugeben.`,go:'eg1',fx:()=>{S.tradition=true}},
+  {t:`Es gut sein lassen. Gegen ein Lied kann man nicht kämpfen.`,go:'eb1'}]}),
+eg1:P('n',()=>{const F=S.end==='F';const w=late();
+  const a=F?`Ich erzählte ihr, was ich falsch gemacht hatte, und was Iolaos gewusst hatte, und wie man es hätte erfahren können, wenn man nur gefragt hätte. `:`Ich erzählte. `;
+  const b=(S.visited.myrto?`Den Knoten hatte ich von Myrto, die ihn von ihrer Großmutter hatte. `:``)+`Ich zeigte ihr den Knoten, mit dem ich ${F?'den Weidenast':'den Fels'} markiert hatte: dreimal herum, einmal durch, nie lösen. `;
+  const c=w?`Nysa sagte nichts, sie hatte seit dem Sumpf kein Wort gesprochen. Aber ihre Finger lernten den Knoten allein.`:`Nysa wiederholte ihn, bis ihre Finger ihn allein konnten.`;
+  return a+b+c},'eg2',{chars:{}}),
+eg2:P('n',`In Lerna gab es von da an zwei Geschichten. Die laute, die man auf den Märkten sang. Und die leise, die Frauen am Feuer von Tochter zu Tochter reichten, mit einem Knoten als Merkzeichen. Die laute hatte die schönere Melodie. Die leise hatte recht.`,'eg3'),
+eg3:P('n',`ENDE`,null,{end:()=>ENDNAMES[S.end]+' – und die andere Überlieferung'}),
+eb1:P('n',`Ich ließ es gut sein. Nysa schlief an meiner Schulter ein. Am Morgen zog Herakles weiter. Der Sänger fügte eine Strophe hinzu, die „Hydra“ hieß. Der Name Kallis kam darin nicht oder nur am Rand vor.`,'eb2',{chars:{}}),
+eb2:P('n',`Jahrhunderte später kennt man die Hydra, die neun Köpfe und den Helden. Wer im Sumpf stand, ist vergessen. Und niemand fragt, wer die Fackeln so gleichmäßig gesetzt hat.`,'eb3'),
+eb3:P('n',`ENDE`,null,{end:()=>ENDNAMES[S.end]})
+};
+
+const $=id=>document.getElementById(id);
+let curBg='',cur=null,curSp=null,curChoices=null,typing=false,timer=null,fullText='';
+const REDUCED=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const val=x=>typeof x==='function'?x():x;
+
+function setBg(name){
+  if(!name||name===curBg)return;curBg=name;
+  const a=$('bg'),b=$('bg2');b.innerHTML=bgSVG(name);b.style.opacity=1;
+  setTimeout(()=>{a.innerHTML=b.innerHTML;b.style.opacity=0},700);
+}
+function setChars(spec,sp){
+  const box=$('chars');box.innerHTML='';
+  Object.entries(spec).forEach(([slot,v])=>{
+    const [k,m]=v.split(':');const el=document.createElement('div');
+    el.className=`slot ${slot} ${CH[k].big?'big':''} ${CH[k].small?'small':''}`;el.dataset.k=k;el.innerHTML=fig(k,m);box.appendChild(el);
+  });
+  dimTo(sp);
+}
+function dimTo(sp){document.querySelectorAll('.slot').forEach(e=>e.classList.toggle('dim',!!sp&&sp!=='n'&&e.dataset.k!==sp))}
+function go(id){
+  const n=ST[id];if(!n){console.error('missing',id);return}
+  if(n.skip&&n.skip())return go(n.skipTo);
+  cur=n;if(n.fx)n.fx();
+  curSp=val(n.sp);
+  if(n.bg)setBg(n.bg);
+  if(n.chars!==undefined)setChars(val(n.chars),curSp);else dimTo(curSp);
+  if(n.end){finish(val(n.end));return}
+  curChoices=val(n.choices)||null;
+  $('name').textContent=curSp==='n'?'':CH[curSp].name;
+  const tx=$('text');tx.className=curSp==='n'?'n':'';
+  fullText=val(n.text);
+  $('choices').innerHTML='';$('more').classList.add('hide');
+  type(tx);
+}
+function type(tx){
+  clearInterval(timer);tx.textContent='';let i=0;typing=true;
+  if(REDUCED){tx.textContent=fullText;done();return}
+  timer=setInterval(()=>{i+=2;tx.textContent=fullText.slice(0,i);if(i>=fullText.length)done()},18);
+}
+function done(){
+  clearInterval(timer);typing=false;$('text').textContent=fullText;
+  if(curChoices){
+    const c=$('choices');
+    curChoices.forEach((ch,i)=>{const b=document.createElement('button');b.textContent=ch.t;b.style.animationDelay=(i*.1)+'s';
+      b.onclick=e=>{e.stopPropagation();if(ch.fx)ch.fx();go(ch.go)};c.appendChild(b)});
+  }else if(cur.next||cur.nextFn)$('more').classList.remove('hide');
+}
+function advance(){
+  if(typing){done();return}
+  if(!curChoices){const nx=cur.nextFn?cur.nextFn():cur.next;if(nx)go(nx)}
+}
+function finish(t){
+  $('name').textContent='';$('text').className='n';fullText='ENDE: '+t;$('text').textContent=fullText;
+  $('choices').innerHTML='';$('more').classList.add('hide');
+  let found=[];try{found=JSON.parse(localStorage.getItem('hydra-ends2')||'[]')}catch(e){}
+  found.forEach(k=>FOUND.add(k));
+  if(S.end)FOUND.add(S.end);
+  try{localStorage.setItem('hydra-ends2',JSON.stringify([...FOUND]))}catch(e){}
+  const x=TS();
+  let sum=comp().length?`Zeugen beim Kampf: ${jn(comp())}. `:`Du hattest keine Zeugen. `;
+  if(S.end==='F')sum+=S.flags.fire?`Du kanntest das Feuer, aber der Kampf scheiterte.`:`Du kanntest das Feuer nicht: Das erfährt man bei Iolaos oder bei Myrto.`;
+  else sum+=`Gewicht der männlichen Zeugen: ${x.t} von ${x.need}.`;
+  if(anyDead())sum+=` ${jn(deadNames())} ${deadNames().length>1?'sind':'ist'} gestorben.`;
+  if(S.silent)sum+=` Du hast geschwiegen, damit man den Männern glaubt.`;
+  const ends=`Enden entdeckt: ${FOUND.size} von 7. `+Object.keys(ENDNAMES).map(k=>FOUND.has(k)?ENDNAMES[k]:'???').join(' · ');
+  setTimeout(()=>{$('endTitle').textContent='Ende: '+t;$('sum').textContent=sum;$('ends').textContent=ends;$('after').classList.remove('hide')},1600);
+}
+function restart(){S=fresh();curBg='';$('after').classList.add('hide');go('a1')}
+
+$('box').addEventListener('click',advance);
+$('stage').addEventListener('click',advance);
+document.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){if(document.activeElement&&document.activeElement.tagName==='BUTTON')return;e.preventDefault();if(!$('title').classList.contains('hide'))return;advance()}});
+$('start').onclick=()=>{$('title').classList.add('hide');go('a1')};
+$('again').onclick=restart;
+setBg('kampf:7');
+</script>
+</body>
+</html>
